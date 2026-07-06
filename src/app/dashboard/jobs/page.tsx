@@ -3,8 +3,9 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { FileText, Package, TriangleAlert } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
-import { useGetHawbJobsQuery, useCreateHawbManifestMutation } from '@/services/hawbApi';
+import { useGetHawbJobsQuery, useCreateHawbManifestMutation, type HawbJob } from '@/services/hawbApi';
 import ApiErrorState from '@/components/ApiErrorState';
 
 const STATUS_TABS: { key: string; label: string }[] = [
@@ -15,9 +16,9 @@ const STATUS_TABS: { key: string; label: string }[] = [
 ];
 
 const STATUS_BADGE: Record<string, string> = {
-  pending_review: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-  ready_to_manifest: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
-  manifested: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+  pending_review: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/60',
+  ready_to_manifest: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-800/60',
+  manifested: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800/60',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -25,6 +26,22 @@ const STATUS_LABEL: Record<string, string> = {
   ready_to_manifest: 'Ready to Manifest',
   manifested: 'Manifested',
 };
+
+function splitAddress(value: string | null): { name: string; address: string } {
+  if (!value) return { name: '—', address: '' };
+  const [first, ...rest] = value.split('\n').map(s => s.trim()).filter(Boolean);
+  return { name: first ?? '—', address: rest.join(', ') };
+}
+
+function PartyCell({ value }: { value: string | null }) {
+  const { name, address } = splitAddress(value);
+  return (
+    <td className="px-4 py-3.5 max-w-[220px]">
+      <p className="text-[12.5px] font-semibold text-gray-800 dark:text-gray-100 truncate">{name}</p>
+      {address && <p className="text-[10.5px] text-gray-400 dark:text-slate-500 truncate mt-0.5">{address}</p>}
+    </td>
+  );
+}
 
 export default function JobsPage() {
   const [status, setStatus] = useState('');
@@ -41,7 +58,7 @@ export default function JobsPage() {
 
   const [createManifest, { isLoading: manifesting }] = useCreateHawbManifestMutation();
 
-  const jobs = useMemo(() => data?.items ?? [], [data]);
+  const jobs: HawbJob[] = useMemo(() => data?.items ?? [], [data]);
 
   const toggle = (id: string) => {
     setSelected(prev => {
@@ -73,8 +90,8 @@ export default function JobsPage() {
     <motion.div variants={pageTransition} initial="hidden" animate="visible" className="space-y-4">
       <motion.div variants={staggerItem} className="flex flex-wrap items-center gap-3">
         <div>
-          <h1 className="text-base font-black text-gray-900 leading-tight">HAWB Jobs</h1>
-          <p className="text-[11px] text-gray-400 mt-0.5">{data?.total ?? 0} total jobs</p>
+          <h1 className="text-base font-black text-gray-900 dark:text-gray-100 leading-tight">HAWB Jobs</h1>
+          <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">{data?.total ?? 0} total jobs</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
           <input
@@ -82,18 +99,20 @@ export default function JobsPage() {
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search HAWB, shipper, consignee…"
-            className="text-[12px] border border-gray-200 rounded-xl px-3 py-2 bg-white w-64 focus:outline-none focus:border-amber-300 focus:ring-2 focus:ring-amber-100"
+            className="text-[12px] border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 w-64 focus:outline-none focus:border-amber-300 dark:focus:border-amber-600 focus:ring-2 focus:ring-amber-100 dark:focus:ring-amber-900/40"
           />
         </div>
       </motion.div>
 
-      <motion.div variants={staggerItem} className="flex items-center bg-gray-100 rounded-xl p-0.5 gap-0.5 w-fit">
+      <motion.div variants={staggerItem} className="flex items-center bg-gray-100 dark:bg-slate-800 rounded-xl p-0.5 gap-0.5 w-fit">
         {STATUS_TABS.map(tab => (
           <button
             key={tab.key}
             onClick={() => { setStatus(tab.key); setPage(1); }}
             className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
-              status === tab.key ? 'bg-white text-amber-700 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+              status === tab.key
+                ? 'bg-white dark:bg-slate-700 text-amber-700 dark:text-amber-400 shadow-sm'
+                : 'text-gray-400 dark:text-slate-400 hover:text-gray-600 dark:hover:text-slate-200'
             }`}
           >
             {tab.label}
@@ -104,9 +123,9 @@ export default function JobsPage() {
       {selected.size > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5"
+          className="flex items-center gap-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl px-4 py-2.5"
         >
-          <span className="text-[12px] font-bold text-amber-700">{selected.size} job{selected.size !== 1 ? 's' : ''} selected</span>
+          <span className="text-[12px] font-bold text-amber-700 dark:text-amber-400">{selected.size} job{selected.size !== 1 ? 's' : ''} selected</span>
           <button
             onClick={handleManifest}
             disabled={manifesting}
@@ -116,7 +135,7 @@ export default function JobsPage() {
           </button>
           <button
             onClick={() => setSelected(new Set())}
-            className="text-[12px] font-semibold text-gray-500 hover:text-gray-700"
+            className="text-[12px] font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"
           >
             Clear
           </button>
@@ -126,20 +145,20 @@ export default function JobsPage() {
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-12 bg-white rounded-xl border border-gray-100 animate-pulse" />
+            <div key={i} className="h-12 bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 animate-pulse" />
           ))}
         </div>
       ) : isError ? (
         <ApiErrorState title="Failed to load jobs" onRetry={refetch} />
       ) : jobs.length === 0 ? (
-        <div className="flex items-center justify-center h-48 text-gray-300 text-sm bg-white rounded-2xl border border-gray-100">
+        <div className="flex items-center justify-center h-48 text-gray-300 dark:text-slate-600 text-sm bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800">
           No jobs found
         </div>
       ) : (
-        <motion.div variants={staggerItem} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <motion.div variants={staggerItem} className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-gray-100">
+              <tr className="border-b border-gray-100 dark:border-slate-800">
                 <th className="px-4 py-3 w-10">
                   <input
                     type="checkbox"
@@ -149,16 +168,16 @@ export default function JobsPage() {
                   />
                 </th>
                 {['HAWB', 'Shipper', 'Consignee', 'Weight (kg)', 'Status', 'Received'].map(h => (
-                  <th key={h} className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                  <th key={h} className={`px-4 py-3 text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider whitespace-nowrap ${h === 'Weight (kg)' ? 'text-right' : ''}`}>
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-50 dark:divide-slate-800/70">
               {jobs.map(job => (
-                <tr key={job.id} className="hover:bg-gray-50/70 transition-colors">
-                  <td className="px-4 py-3">
+                <tr key={job.id} className="hover:bg-gray-50/70 dark:hover:bg-slate-800/50 transition-colors">
+                  <td className="px-4 py-3.5">
                     {job.status === 'ready_to_manifest' && (
                       <input
                         type="checkbox"
@@ -168,20 +187,31 @@ export default function JobsPage() {
                       />
                     )}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <Link href={`/dashboard/jobs/${job.id}`} className="font-mono font-bold text-amber-600 text-[12px] hover:underline">
+                  <td className="px-4 py-3.5 whitespace-nowrap">
+                    <Link href={`/dashboard/jobs/${job.id}`} className="flex items-center gap-1.5 font-mono font-bold text-amber-600 dark:text-amber-400 text-[12px] hover:underline w-fit">
+                      <FileText size={13} className="shrink-0 opacity-50" />
                       {job.hawb_number}
                     </Link>
+                    {job.packages.length > 1 && (
+                      <span className="mt-1 inline-flex items-center gap-1 text-[9px] font-bold text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
+                        <Package size={9} /> {job.packages.length} pkgs
+                      </span>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-[12px] text-gray-700 max-w-[200px] truncate">{job.shipper ?? '—'}</td>
-                  <td className="px-4 py-3 text-[12px] text-gray-700 max-w-[200px] truncate">{job.consignee ?? '—'}</td>
-                  <td className="px-4 py-3 text-[12px] text-gray-700 whitespace-nowrap">{job.weight_kg ?? '—'}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`inline-flex items-center text-[11px] font-bold px-2.5 py-1 rounded-full ${STATUS_BADGE[job.status]}`}>
-                      {STATUS_LABEL[job.status]}
-                    </span>
+                  <PartyCell value={job.shipper} />
+                  <PartyCell value={job.consignee} />
+                  <td className="px-4 py-3.5 text-[12px] text-gray-700 dark:text-slate-300 whitespace-nowrap text-right tabular-nums">{job.weight_kg ?? '—'}</td>
+                  <td className="px-4 py-3.5 whitespace-nowrap">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`inline-flex items-center text-[11px] font-bold px-2.5 py-1 rounded-full ${STATUS_BADGE[job.status]}`}>
+                        {STATUS_LABEL[job.status]}
+                      </span>
+                      {job.dangerous_goods && (
+                        <TriangleAlert size={13} className="text-red-500 dark:text-red-400 shrink-0" />
+                      )}
+                    </div>
                   </td>
-                  <td className="px-4 py-3 text-[11px] text-gray-500 whitespace-nowrap">
+                  <td className="px-4 py-3.5 text-[11px] text-gray-500 dark:text-slate-500 whitespace-nowrap">
                     {new Date(job.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </td>
                 </tr>
@@ -190,20 +220,20 @@ export default function JobsPage() {
           </table>
 
           {data && data.total_pages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-              <span className="text-[11px] text-gray-400">Page {data.page} of {data.total_pages}</span>
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-slate-800">
+              <span className="text-[11px] text-gray-400 dark:text-slate-500">Page {data.page} of {data.total_pages}</span>
               <div className="flex gap-2">
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page <= 1}
-                  className="text-[11px] font-bold text-gray-500 bg-gray-50 hover:bg-gray-100 disabled:opacity-40 px-3 py-1.5 rounded-lg transition-colors"
+                  className="text-[11px] font-bold text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-40 px-3 py-1.5 rounded-lg transition-colors"
                 >
                   Previous
                 </button>
                 <button
                   onClick={() => setPage(p => Math.min(data.total_pages, p + 1))}
                   disabled={page >= data.total_pages}
-                  className="text-[11px] font-bold text-gray-500 bg-gray-50 hover:bg-gray-100 disabled:opacity-40 px-3 py-1.5 rounded-lg transition-colors"
+                  className="text-[11px] font-bold text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-40 px-3 py-1.5 rounded-lg transition-colors"
                 >
                   Next
                 </button>

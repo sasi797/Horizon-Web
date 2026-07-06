@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAppSelector } from '@/store/hooks';
 
 const Spinner = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+  <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950">
     <div className="w-6 h-6 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
   </div>
 );

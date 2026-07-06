@@ -23,21 +23,21 @@ export default function ApiErrorState({ title, message, onRetry, status }: Props
   return (
     <div className="flex items-center justify-center py-16">
       <div className="text-center space-y-3 max-w-xs">
-        <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto">
+        <div className="w-12 h-12 rounded-2xl bg-red-50 dark:bg-red-950/40 flex items-center justify-center mx-auto">
           <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
         <div>
-          <p className="font-bold text-gray-800 text-sm">{displayTitle}</p>
-          <p className="text-xs text-gray-400 mt-1">{displayMessage}</p>
-          {status && <p className="text-[10px] text-gray-300 mt-1 font-mono">HTTP {status}</p>}
+          <p className="font-bold text-gray-800 dark:text-gray-100 text-sm">{displayTitle}</p>
+          <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">{displayMessage}</p>
+          {status && <p className="text-[10px] text-gray-300 dark:text-slate-600 mt-1 font-mono">HTTP {status}</p>}
         </div>
         {onRetry && (
           <button
             onClick={onRetry}
-            className="text-xs font-bold text-amber-600 border border-amber-200 px-4 py-1.5 rounded-lg hover:bg-amber-50 transition-colors"
+            className="text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 px-4 py-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
           >
             Retry
           </button>

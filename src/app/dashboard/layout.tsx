@@ -14,7 +14,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <ErrorBoundary>
       <DashboardGuard>
-        <div className="flex h-full overflow-hidden bg-gray-50">
+        <div className="flex h-full overflow-hidden bg-gray-50 dark:bg-slate-950">
 
           {/* Desktop sidebar — inline in flex flow at lg+ */}
           <div className="hidden lg:block shrink-0">

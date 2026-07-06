@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
+/* Manually-toggled dark mode: dark: utilities activate off a .dark class on
+   <html> (set by ThemeProvider), not just prefers-color-scheme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f8f9fb;
   --foreground: #111827;
+}
+
+.dark {
+  --background: #0b1120;
+  --foreground: #e5e7eb;
 }
 
 @theme inline {
@@ -44,4 +53,13 @@ a {
 }
 *::-webkit-scrollbar-thumb:hover {
   background-color: #9ca3af;
+}
+.dark *::-webkit-scrollbar-thumb {
+  background-color: #334155;
+}
+.dark *::-webkit-scrollbar-thumb:hover {
+  background-color: #475569;
+}
+.dark * {
+  scrollbar-color: #334155 transparent;
 }

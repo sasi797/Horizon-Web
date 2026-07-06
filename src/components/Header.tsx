@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { usePathname } from 'next/navigation';
+import { Sun, Moon } from 'lucide-react';
 import { useAppSelector } from '@/store/hooks';
+import { useTheme } from '@/providers/ThemeProvider';
 
 const PATH_TITLES: { match: (p: string) => boolean; title: string; sub: string }[] = [
   { match: p => /^\/dashboard\/jobs\/.+/.test(p),      title: 'Job Detail',      sub: 'Extracted data & source PDF' },
@@ -17,6 +19,7 @@ export default function Header({ onMenuToggle }: { onMenuToggle?: () => void }) 
   const pathname = usePathname();
   const page     = PATH_TITLES.find(t => t.match(pathname)) ?? { title: 'Horizon', sub: '' };
   const { title, sub } = page;
+  const { theme, toggleTheme } = useTheme();
 
   const [clock, setClock] = useState(() => new Date());
   const [tz, setTz]       = useState<'Asia/Kolkata' | 'Europe/London'>('Europe/London');
@@ -39,12 +42,12 @@ export default function Header({ onMenuToggle }: { onMenuToggle?: () => void }) 
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="h-14 bg-gradient-to-r from-amber-50/40 via-white to-white backdrop-blur-md border-b border-gray-200/60 flex items-center gap-2 px-3 md:px-6 sticky top-0 z-10 shadow-sm"
+      className="h-14 bg-gradient-to-r from-amber-50/40 via-white to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 backdrop-blur-md border-b border-gray-200/60 dark:border-slate-700/60 flex items-center gap-2 px-3 md:px-6 sticky top-0 z-10 shadow-sm"
     >
       {/* Hamburger — shown below lg breakpoint */}
       <button
         onClick={onMenuToggle}
-        className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors shrink-0"
+        className="lg:hidden p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-700 dark:hover:text-slate-200 transition-colors shrink-0"
         aria-label="Open menu"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -53,8 +56,8 @@ export default function Header({ onMenuToggle }: { onMenuToggle?: () => void }) 
       </button>
 
       <div className="min-w-0">
-        <p className="text-[13px] font-black text-gray-900 leading-tight truncate">{title}</p>
-        {sub && <p className="text-[10.5px] text-gray-400 leading-tight truncate">{sub}</p>}
+        <p className="text-[13px] font-black text-gray-900 dark:text-gray-100 leading-tight truncate">{title}</p>
+        {sub && <p className="text-[10.5px] text-gray-400 dark:text-slate-500 leading-tight truncate">{sub}</p>}
       </div>
 
       <div className="flex-1 min-w-0" />
@@ -62,35 +65,46 @@ export default function Header({ onMenuToggle }: { onMenuToggle?: () => void }) 
       {/* Right */}
       <div className="flex items-center gap-2 shrink-0">
 
+        {/* Theme toggle */}
+        <motion.button
+          onClick={toggleTheme}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.93 }}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          className="p-2 rounded-xl text-gray-500 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-slate-800 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+        >
+          {theme === 'dark' ? <Sun size={17} strokeWidth={1.8} /> : <Moon size={17} strokeWidth={1.8} />}
+        </motion.button>
+
         {/* Clock — click to toggle IST / UK */}
         <button
           onClick={() => setTz(z => z === 'Asia/Kolkata' ? 'Europe/London' : 'Asia/Kolkata')}
           title="Click to switch timezone"
-          className="hidden lg:flex flex-col items-end leading-none bg-gray-50 border border-gray-100 px-2.5 py-1.5 rounded-lg select-none hover:bg-amber-50 hover:border-amber-200 transition-colors cursor-pointer"
+          className="hidden lg:flex flex-col items-end leading-none bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 px-2.5 py-1.5 rounded-lg select-none hover:bg-amber-50 dark:hover:bg-slate-700 hover:border-amber-200 dark:hover:border-slate-600 transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-1">
-            <span className="text-[9px] font-bold text-amber-600 uppercase">{tzLabel}</span>
-            <span className="text-[12.5px] font-bold text-gray-900 tabular-nums">{timeStr}</span>
+            <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase">{tzLabel}</span>
+            <span className="text-[12.5px] font-bold text-gray-900 dark:text-gray-100 tabular-nums">{timeStr}</span>
           </div>
-          <span className="text-[9.5px] text-gray-700 font-medium mt-0.5">{dateStr}</span>
+          <span className="text-[9.5px] text-gray-700 dark:text-slate-400 font-medium mt-0.5">{dateStr}</span>
         </button>
 
         {/* Divider */}
-        <div className="w-px h-6 bg-gray-200 mx-0.5" />
+        <div className="w-px h-6 bg-gray-200 dark:bg-slate-700 mx-0.5" />
 
         {/* User profile pill */}
         <motion.button
-          whileHover={{ backgroundColor: '#fffbeb' }}
+          whileHover={{ backgroundColor: theme === 'dark' ? '#1e293b' : '#fffbeb' }}
           whileTap={{ scale: 0.97 }}
           transition={{ duration: 0.15 }}
-          className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl border border-transparent hover:border-amber-100 cursor-default select-none"
+          className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl border border-transparent hover:border-amber-100 dark:hover:border-slate-700 cursor-default select-none"
         >
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-xs font-bold shadow-sm shadow-amber-200 shrink-0 ring-2 ring-white">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-xs font-bold shadow-sm shadow-amber-200 dark:shadow-none shrink-0 ring-2 ring-white dark:ring-slate-900">
             {user?.name?.charAt(0)?.toUpperCase() ?? '?'}
           </div>
           <div className="text-left hidden sm:block">
-            <p className="text-[12px] font-bold text-gray-900 leading-tight">{user?.name ?? '—'}</p>
-            <p className="text-[10px] text-gray-700 capitalize leading-tight">{user?.role ?? ''}</p>
+            <p className="text-[12px] font-bold text-gray-900 dark:text-gray-100 leading-tight">{user?.name ?? '—'}</p>
+            <p className="text-[10px] text-gray-700 dark:text-slate-400 capitalize leading-tight">{user?.role ?? ''}</p>
           </div>
         </motion.button>
       </div>

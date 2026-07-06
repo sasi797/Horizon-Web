@@ -9,9 +9,9 @@ import ApiErrorState from '@/components/ApiErrorState';
 import PdfViewer from '@/components/PdfViewer';
 
 const STATUS_BADGE: Record<string, string> = {
-  pending_review: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-  ready_to_manifest: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
-  manifested: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+  pending_review: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/60',
+  ready_to_manifest: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-800/60',
+  manifested: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800/60',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -85,7 +85,7 @@ export default function JobDetailPage() {
   }, [job]);
 
   if (isLoading) {
-    return <div className="h-[70vh] bg-white rounded-2xl border border-gray-100 animate-pulse" />;
+    return <div className="h-[70vh] bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 animate-pulse" />;
   }
   if (isError || !job) {
     return <ApiErrorState title="Failed to load job" onRetry={refetch} />;
@@ -113,14 +113,14 @@ export default function JobDetailPage() {
   return (
     <motion.div variants={pageTransition} initial="hidden" animate="visible" className="space-y-4 h-full flex flex-col">
       <motion.div variants={staggerItem} className="flex flex-wrap items-center gap-3">
-        <button onClick={() => router.push('/dashboard/jobs')} className="text-gray-400 hover:text-gray-600">
+        <button onClick={() => router.push('/dashboard/jobs')} className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
         <div>
-          <h1 className="text-base font-black text-gray-900 leading-tight font-mono">{job.hawb_number}</h1>
-          <p className="text-[11px] text-gray-400 mt-0.5">{job.document.filename}</p>
+          <h1 className="text-base font-black text-gray-900 dark:text-gray-100 leading-tight font-mono">{job.hawb_number}</h1>
+          <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">{job.document.filename}</p>
         </div>
         <span className={`inline-flex items-center text-[11px] font-bold px-2.5 py-1 rounded-full ${STATUS_BADGE[job.status]}`}>
           {STATUS_LABEL[job.status]}
@@ -131,17 +131,17 @@ export default function JobDetailPage() {
             <button
               onClick={() => prevSibling && router.push(`/dashboard/jobs/${prevSibling.id}`)}
               disabled={!prevSibling}
-              className="text-[11px] font-bold text-gray-500 hover:text-amber-700 disabled:opacity-30 disabled:hover:text-gray-500 px-2 py-1 rounded-lg transition-colors"
+              className="text-[11px] font-bold text-gray-500 dark:text-slate-400 hover:text-amber-700 dark:hover:text-amber-400 disabled:opacity-30 disabled:hover:text-gray-500 dark:disabled:hover:text-slate-400 px-2 py-1 rounded-lg transition-colors"
             >
               ◀ Prev HAWB
             </button>
-            <span className="text-[10.5px] text-gray-400 font-medium whitespace-nowrap">
+            <span className="text-[10.5px] text-gray-400 dark:text-slate-500 font-medium whitespace-nowrap">
               {siblingIndex + 1} of {siblings.length} in this document
             </span>
             <button
               onClick={() => nextSibling && router.push(`/dashboard/jobs/${nextSibling.id}`)}
               disabled={!nextSibling}
-              className="text-[11px] font-bold text-gray-500 hover:text-amber-700 disabled:opacity-30 disabled:hover:text-gray-500 px-2 py-1 rounded-lg transition-colors"
+              className="text-[11px] font-bold text-gray-500 dark:text-slate-400 hover:text-amber-700 dark:hover:text-amber-400 disabled:opacity-30 disabled:hover:text-gray-500 dark:disabled:hover:text-slate-400 px-2 py-1 rounded-lg transition-colors"
             >
               Next HAWB ▶
             </button>
@@ -166,9 +166,9 @@ export default function JobDetailPage() {
         </div>
 
         {/* Fields pane */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4 overflow-y-auto">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm p-5 space-y-4 overflow-y-auto">
           {locked && (
-            <div className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+            <div className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl px-3 py-2">
               This job is locked in a manifest. Remove it from the manifest to edit.
             </div>
           )}
@@ -254,7 +254,7 @@ export default function JobDetailPage() {
                 }}
                 className="rounded cursor-pointer"
               />
-              <span className="text-[12px] text-gray-600">Flagged as dangerous goods</span>
+              <span className="text-[12px] text-gray-600 dark:text-slate-300">Flagged as dangerous goods</span>
             </label>
           </Field>
 
@@ -271,8 +271,8 @@ export default function JobDetailPage() {
             </Field>
           )}
 
-          <div className="pt-2 border-t border-gray-100">
-            <p className="text-[11px] font-black text-gray-500 uppercase tracking-wide mb-3">Additional Details</p>
+          <div className="pt-2 border-t border-gray-100 dark:border-slate-800">
+            <p className="text-[11px] font-black text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-3">Additional Details</p>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Client Account">
@@ -393,7 +393,7 @@ export default function JobDetailPage() {
                 <Field label="Package Lines">
                   <div className="space-y-1.5">
                     {job.packages.map((p, i) => (
-                      <div key={i} className="text-[12px] text-gray-700 bg-gray-50/60 border border-gray-100 rounded-lg px-3 py-2">
+                      <div key={i} className="text-[12px] text-gray-700 dark:text-slate-300 bg-gray-50/60 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700 rounded-lg px-3 py-2">
                         {[p.supplier, p.package_type, p.weight_kg != null ? `${p.weight_kg} kg` : null, p.content_description]
                           .filter(Boolean).join(' · ')}
                       </div>
@@ -412,14 +412,14 @@ export default function JobDetailPage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">{label}</label>
+      <label className="block text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1.5">{label}</label>
       {children}
     </div>
   );
 }
 
 function inputClass(locked: boolean) {
-  return `w-full text-[13px] border border-gray-200 rounded-xl px-3 py-2 bg-gray-50/60 text-gray-700 focus:outline-none focus:border-amber-300 focus:bg-white focus:ring-2 focus:ring-amber-100 transition-all ${
+  return `w-full text-[13px] border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-gray-50/60 dark:bg-slate-800/60 text-gray-700 dark:text-gray-200 focus:outline-none focus:border-amber-300 dark:focus:border-amber-600 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-amber-100 dark:focus:ring-amber-900/40 transition-all ${
     locked ? 'opacity-60 cursor-not-allowed' : ''
   }`;
 }
