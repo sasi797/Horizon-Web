@@ -14,14 +14,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <ErrorBoundary>
       <DashboardGuard>
-        <div className="flex h-full overflow-hidden bg-gray-50 dark:bg-slate-950">
+        <div className="flex h-full overflow-hidden bg-gray-50 dark:bg-navy-950">
 
           {/* Desktop sidebar — inline in flex flow at lg+ */}
           <div className="hidden lg:block shrink-0">
-            <Sidebar
-              collapsed={sidebarCollapsed}
-              onToggleCollapse={() => setSidebarCollapsed(v => !v)}
-            />
+            <Sidebar collapsed={sidebarCollapsed} />
           </div>
 
           {/* Mobile/tablet overlay sidebar — only mounts when open */}
@@ -50,7 +47,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </AnimatePresence>
 
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <Header onMenuToggle={() => setSidebarOpen(v => !v)} />
+            <Header
+              onMenuToggle={() => setSidebarOpen(v => !v)}
+              collapsed={sidebarCollapsed}
+              onToggleCollapse={() => setSidebarCollapsed(v => !v)}
+            />
             <main id="main-scroll" className="flex-1 overflow-y-auto p-3 md:p-4">
               <ErrorBoundary>
                 {children}

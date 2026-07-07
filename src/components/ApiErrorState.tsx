@@ -31,13 +31,13 @@ export default function ApiErrorState({ title, message, onRetry, status }: Props
         </div>
         <div>
           <p className="font-bold text-gray-800 dark:text-gray-100 text-sm">{displayTitle}</p>
-          <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">{displayMessage}</p>
-          {status && <p className="text-[10px] text-gray-300 dark:text-slate-600 mt-1 font-mono">HTTP {status}</p>}
+          <p className="text-xs text-gray-400 dark:text-navy-500 mt-1">{displayMessage}</p>
+          {status && <p className="text-[10px] text-gray-300 dark:text-navy-600 mt-1 font-mono">HTTP {status}</p>}
         </div>
         {onRetry && (
           <button
             onClick={onRetry}
-            className="text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 px-4 py-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
+            className="text-xs font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 px-4 py-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
           >
             Retry
           </button>

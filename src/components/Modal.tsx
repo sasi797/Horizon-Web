@@ -28,7 +28,7 @@ export default function Modal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-xl"
+            className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-xl"
           >
             {children}
           </motion.div>

@@ -85,7 +85,7 @@ export default function JobDetailPage() {
   }, [job]);
 
   if (isLoading) {
-    return <div className="h-[70vh] bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 animate-pulse" />;
+    return <div className="h-[70vh] bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 animate-pulse" />;
   }
   if (isError || !job) {
     return <ApiErrorState title="Failed to load job" onRetry={refetch} />;
@@ -116,14 +116,14 @@ export default function JobDetailPage() {
   return (
     <motion.div variants={pageTransition} initial="hidden" animate="visible" className="space-y-4 h-full flex flex-col">
       <motion.div variants={staggerItem} className="flex flex-wrap items-center gap-3">
-        <button onClick={() => router.push('/dashboard/jobs')} className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300">
+        <button onClick={() => router.push('/dashboard/jobs')} className="text-gray-400 dark:text-navy-500 hover:text-gray-600 dark:hover:text-navy-300">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
         <div>
           <h1 className="text-base font-black text-gray-900 dark:text-gray-100 leading-tight font-mono">{job.hawb_number}</h1>
-          <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">{job.document.filename}</p>
+          <p className="text-[11px] text-gray-400 dark:text-navy-500 mt-0.5">{job.document.filename}</p>
         </div>
         <span className={`inline-flex items-center text-[11px] font-bold px-2.5 py-1 rounded-full ${STATUS_BADGE[job.status]}`}>
           {STATUS_LABEL[job.status]}
@@ -134,17 +134,17 @@ export default function JobDetailPage() {
             <button
               onClick={() => prevSibling && router.push(`/dashboard/jobs/${prevSibling.id}`)}
               disabled={!prevSibling}
-              className="text-[11px] font-bold text-gray-500 dark:text-slate-400 hover:text-amber-700 dark:hover:text-amber-400 disabled:opacity-30 disabled:hover:text-gray-500 dark:disabled:hover:text-slate-400 px-2 py-1 rounded-lg transition-colors"
+              className="text-[11px] font-bold text-gray-500 dark:text-navy-400 hover:text-emerald-700 dark:hover:text-emerald-400 disabled:opacity-30 disabled:hover:text-gray-500 dark:disabled:hover:text-navy-400 px-2 py-1 rounded-lg transition-colors"
             >
               ◀ Prev HAWB
             </button>
-            <span className="text-[10.5px] text-gray-400 dark:text-slate-500 font-medium whitespace-nowrap">
+            <span className="text-[10.5px] text-gray-400 dark:text-navy-500 font-medium whitespace-nowrap">
               {siblingIndex + 1} of {siblings.length} in this document
             </span>
             <button
               onClick={() => nextSibling && router.push(`/dashboard/jobs/${nextSibling.id}`)}
               disabled={!nextSibling}
-              className="text-[11px] font-bold text-gray-500 dark:text-slate-400 hover:text-amber-700 dark:hover:text-amber-400 disabled:opacity-30 disabled:hover:text-gray-500 dark:disabled:hover:text-slate-400 px-2 py-1 rounded-lg transition-colors"
+              className="text-[11px] font-bold text-gray-500 dark:text-navy-400 hover:text-emerald-700 dark:hover:text-emerald-400 disabled:opacity-30 disabled:hover:text-gray-500 dark:disabled:hover:text-navy-400 px-2 py-1 rounded-lg transition-colors"
             >
               Next HAWB ▶
             </button>
@@ -155,7 +155,7 @@ export default function JobDetailPage() {
           <button
             onClick={handleReady}
             disabled={markingReady}
-            className="ml-auto text-[12px] font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-60 px-4 py-2 rounded-xl transition-colors"
+            className="ml-auto text-[12px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 px-4 py-2 rounded-xl transition-colors"
           >
             {markingReady ? 'Marking ready…' : 'Ready to Manifest'}
           </button>
@@ -169,7 +169,7 @@ export default function JobDetailPage() {
         </div>
 
         {/* Fields pane */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm p-5 space-y-4 overflow-y-auto">
+        <div className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm p-5 space-y-4 overflow-y-auto">
           {locked && (
             <div className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl px-3 py-2">
               This job is locked in a manifest. Remove it from the manifest to edit.
@@ -255,9 +255,9 @@ export default function JobDetailPage() {
                   setForm(f => ({ ...f, dangerous_goods: e.target.checked }));
                   save('dangerous_goods', e.target.checked);
                 }}
-                className="rounded cursor-pointer"
+                className="rounded cursor-pointer accent-emerald-600"
               />
-              <span className="text-[12px] text-gray-600 dark:text-slate-300">Flagged as dangerous goods</span>
+              <span className="text-[12px] text-gray-600 dark:text-navy-300">Flagged as dangerous goods</span>
             </label>
           </Field>
 
@@ -274,8 +274,8 @@ export default function JobDetailPage() {
             </Field>
           )}
 
-          <div className="pt-2 border-t border-gray-100 dark:border-slate-800">
-            <p className="text-[11px] font-black text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-3">Additional Details</p>
+          <div className="pt-2 border-t border-gray-100 dark:border-navy-800">
+            <p className="text-[11px] font-black text-gray-500 dark:text-navy-400 uppercase tracking-wide mb-3">Additional Details</p>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Client Account">
@@ -397,10 +397,10 @@ export default function JobDetailPage() {
               {job.packages.length > 0 && (
                 <Field label={`Packages (${job.packages.length})`}>
                   {multiPackage && packagesHaveDetail ? (
-                    <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-slate-800">
+                    <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-navy-800">
                       <table className="w-full text-[11.5px]">
                         <thead>
-                          <tr className="bg-gray-50/80 dark:bg-slate-800/60 text-gray-400 dark:text-slate-500 uppercase tracking-wide text-[10px]">
+                          <tr className="bg-gray-50/80 dark:bg-navy-800/60 text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[10px]">
                             <th className="text-left font-bold px-3 py-2">Type</th>
                             <th className="text-right font-bold px-3 py-2">Weight</th>
                             <th className="text-left font-bold px-3 py-2">Temp</th>
@@ -408,9 +408,9 @@ export default function JobDetailPage() {
                             <th className="text-left font-bold px-3 py-2">Content</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                        <tbody className="divide-y divide-gray-100 dark:divide-navy-800">
                           {job.packages.map((p, i) => (
-                            <tr key={i} className="text-gray-700 dark:text-slate-300">
+                            <tr key={i} className="text-gray-700 dark:text-navy-300">
                               <td className="px-3 py-2 font-semibold whitespace-nowrap">{[p.supplier, p.package_type].filter(Boolean).join(' ') || '—'}</td>
                               <td className="px-3 py-2 text-right whitespace-nowrap">{p.weight_kg != null ? `${p.weight_kg} kg` : '—'}</td>
                               <td className="px-3 py-2 whitespace-nowrap">{p.temperature_range || '—'}</td>
@@ -424,7 +424,7 @@ export default function JobDetailPage() {
                   ) : (
                     <div className="space-y-1.5">
                       {job.packages.map((p, i) => (
-                        <div key={i} className="text-[12px] text-gray-700 dark:text-slate-300 bg-gray-50/60 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700 rounded-lg px-3 py-2">
+                        <div key={i} className="text-[12px] text-gray-700 dark:text-navy-300 bg-gray-50/60 dark:bg-navy-800/60 border border-gray-100 dark:border-navy-700 rounded-lg px-3 py-2">
                           {[p.supplier, p.package_type, p.weight_kg != null ? `${p.weight_kg} kg` : null, p.content_description]
                             .filter(Boolean).join(' · ')}
                         </div>
@@ -444,14 +444,14 @@ export default function JobDetailPage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1.5">{label}</label>
+      <label className="block text-[10px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide mb-1.5">{label}</label>
       {children}
     </div>
   );
 }
 
 function inputClass(locked: boolean) {
-  return `w-full text-[13px] border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-gray-50/60 dark:bg-slate-800/60 text-gray-700 dark:text-gray-200 focus:outline-none focus:border-amber-300 dark:focus:border-amber-600 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-amber-100 dark:focus:ring-amber-900/40 transition-all ${
+  return `w-full text-[13px] border border-gray-200 dark:border-navy-700 rounded-xl px-3 py-2 bg-gray-50/60 dark:bg-navy-800/60 text-gray-700 dark:text-gray-200 focus:outline-none focus:border-emerald-300 dark:focus:border-emerald-600 focus:bg-white dark:focus:bg-navy-800 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/40 transition-all ${
     locked ? 'opacity-60 cursor-not-allowed' : ''
   }`;
 }

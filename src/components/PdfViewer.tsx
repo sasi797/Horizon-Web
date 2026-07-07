@@ -40,7 +40,7 @@ export default function PdfViewer({
     : `Page ${pageNumber} of ${numPages}`;
 
   return (
-    <div className="flex flex-col h-full bg-gray-100 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 overflow-hidden">
+    <div className="flex flex-col h-full bg-gray-100 dark:bg-navy-800 rounded-2xl border border-gray-100 dark:border-navy-700 overflow-hidden">
       <div
         className="flex-1 overflow-auto flex justify-center p-3"
         ref={el => { if (el && width === 0) setWidth(el.clientWidth - 24); }}
@@ -48,7 +48,7 @@ export default function PdfViewer({
         <Document
           file={url}
           onLoadSuccess={({ numPages: n }) => setNumPages(n)}
-          loading={<div className="text-xs text-gray-400 dark:text-slate-500 py-10">Loading PDF…</div>}
+          loading={<div className="text-xs text-gray-400 dark:text-navy-500 py-10">Loading PDF…</div>}
           error={<div className="text-xs text-red-400 py-10">Failed to load PDF.</div>}
         >
           <Page pageNumber={pageNumber} width={width || undefined} />
@@ -56,19 +56,19 @@ export default function PdfViewer({
       </div>
 
       {numPages > 1 && (
-        <div className="flex items-center justify-center gap-3 py-2 border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
+        <div className="flex items-center justify-center gap-3 py-2 border-t border-gray-200 dark:border-navy-700 bg-white dark:bg-navy-900 shrink-0">
           <button
             onClick={() => setPageNumber(p => Math.max(1, p - 1))}
             disabled={pageNumber <= 1}
-            className="text-[11px] font-bold text-gray-500 dark:text-slate-400 disabled:opacity-40 px-2 py-1"
+            className="text-[11px] font-bold text-gray-500 dark:text-navy-400 disabled:opacity-40 px-2 py-1"
           >
             ← Prev
           </button>
-          <span className="text-[11px] text-gray-500 dark:text-slate-400 font-medium">{pagerLabel}</span>
+          <span className="text-[11px] text-gray-500 dark:text-navy-400 font-medium">{pagerLabel}</span>
           <button
             onClick={() => setPageNumber(p => Math.min(numPages, p + 1))}
             disabled={pageNumber >= numPages}
-            className="text-[11px] font-bold text-gray-500 dark:text-slate-400 disabled:opacity-40 px-2 py-1"
+            className="text-[11px] font-bold text-gray-500 dark:text-navy-400 disabled:opacity-40 px-2 py-1"
           >
             Next →
           </button>

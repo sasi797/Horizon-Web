@@ -3,18 +3,16 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Mail, Lock, Eye, EyeOff, KeyRound, ArrowLeft, ArrowRight,
+  Package, Truck, MapPin, PlaneTakeoff, AlertCircle, CheckCircle2,
+} from 'lucide-react';
+import Logo from '@/components/Logo';
 import { useLoginMutation, useResetPasswordMutation } from '@/services/authApi';
 import { useAppDispatch } from '@/store/hooks';
 import { setCredentials } from '@/store/slices/authSlice';
 
 type View = 'login' | 'reset';
-
-const SunriseLogo = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <circle cx="12" cy="12" r="6.5" strokeWidth="2" />
-    <line x1="4" y1="12" x2="20" y2="12" strokeWidth="2" strokeLinecap="round" />
-  </svg>
-);
 
 export default function LoginPage() {
   const router   = useRouter();
@@ -75,61 +73,32 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden"
-      style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #0c4a6e 100%)' }}
-    >
+    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-gray-100">
       {/* Dot grid */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id="bg-dots" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
-            <circle cx="1.5" cy="1.5" r="1.5" fill="white" fillOpacity="0.12" />
+            <circle cx="1.5" cy="1.5" r="1.5" fill="#94a3b8" fillOpacity="0.35" />
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#bg-dots)" />
       </svg>
-
-      {/* Glowing blobs — sunrise glow */}
-      <div className="absolute -top-40 -left-40 w-[30rem] h-[30rem] rounded-full bg-amber-400/20 blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-48 -right-48 w-[34rem] h-[34rem] rounded-full bg-orange-500/20 blur-3xl pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[22rem] h-[22rem] rounded-full bg-amber-300/10 blur-3xl pointer-events-none" />
-
-      {/* Outlined rings */}
-      <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full border border-white/15 pointer-events-none" />
-      <div className="absolute -top-8  -left-8  w-48 h-48 rounded-full border border-white/10 pointer-events-none" />
-      <div className="absolute -bottom-24 -right-24 w-80 h-80 rounded-full border border-white/15 pointer-events-none" />
-      <div className="absolute -bottom-10 -right-10 w-56 h-56 rounded-full border border-white/10 pointer-events-none" />
-      <div className="absolute top-[12%] right-[8%] w-20 h-20 rounded-full border border-white/15 pointer-events-none" />
-      <div className="absolute bottom-[15%] left-[6%] w-16 h-16 rounded-full border border-white/15 pointer-events-none" />
-
-      {/* Plus signs */}
-      {[
-        { top: '7%',  left: '5%',  size: '1.4rem' },
-        { top: '5%',  left: '87%', size: '1.4rem' },
-        { top: '87%', left: '5%',  size: '1.4rem' },
-        { top: '91%', left: '91%', size: '1.4rem' },
-        { top: '48%', left: '2%',  size: '1.1rem' },
-        { top: '44%', left: '95%', size: '1.1rem' },
-      ].map(({ size, ...s }, i) => (
-        <span key={i} className="absolute text-white/25 font-light pointer-events-none select-none"
-          style={{ ...s, fontSize: size }}>+</span>
-      ))}
 
       {/* Floating card */}
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="w-full max-w-[860px] min-h-[500px] rounded-2xl overflow-hidden shadow-2xl shadow-black/30 flex relative z-10"
+        className="w-full max-w-[860px] min-h-[500px] rounded-2xl overflow-hidden shadow-xl shadow-gray-300/50 border border-gray-200 flex relative z-10 bg-white"
       >
 
-        {/* ── LEFT: navy panel with sunrise glow ── */}
+        {/* ── LEFT: navy hero panel ── */}
         <div
           className="hidden md:flex w-[52%] shrink-0 relative overflow-hidden flex-col justify-center px-12 py-10"
-          style={{ background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 55%, #7c2d12 130%)' }}
+          style={{ background: 'linear-gradient(145deg, #0f1f3a 0%, #0a1628 55%, #065f46 130%)' }}
         >
-          {/* Horizon glow */}
-          <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-[36rem] h-[18rem] rounded-full bg-gradient-to-t from-amber-500/40 via-orange-500/15 to-transparent blur-2xl pointer-events-none" />
+          {/* Green glow */}
+          <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-[36rem] h-[18rem] rounded-full bg-gradient-to-t from-emerald-500/40 via-emerald-400/15 to-transparent blur-2xl pointer-events-none" />
 
           {/* Topographic contour lines */}
           <svg className="absolute inset-0 w-full h-full" fill="none" preserveAspectRatio="xMidYMid slice">
@@ -175,16 +144,33 @@ export default function LoginPage() {
           <div className="absolute -bottom-14 -left-14 w-44 h-44 rounded-full border border-white/20 pointer-events-none" />
           <div className="absolute -bottom-7  -left-7  w-28 h-28 rounded-full border border-white/15 pointer-events-none" />
 
-          {/* Logo — bigger, no subtitle */}
+          {/* Logo */}
           <motion.div
             initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-            className="absolute top-8 left-12 flex items-center gap-3"
+            className="absolute top-8 left-12 bg-white rounded-lg px-4 py-3 shadow-lg inline-flex items-center justify-center"
           >
-            <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-black/20 text-white">
-              <SunriseLogo size={24} />
-            </div>
-            <p className="font-black text-white text-lg tracking-tight">Horizon</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/HorizonLogo.png" alt="Horizon Express" className="h-10 w-auto block" />
           </motion.div>
+
+          {/* Scattered logistics icon tiles */}
+          {[
+            { Icon: Package,      top: '20%', left: '62%', rotate: -8,  delay: 0.5 },
+            { Icon: Truck,        top: '58%', left: '8%',  rotate: 6,   delay: 0.6 },
+            { Icon: PlaneTakeoff, top: '14%', left: '10%', rotate: 5,   delay: 0.7 },
+            { Icon: MapPin,       top: '68%', left: '66%', rotate: -5,  delay: 0.8 },
+          ].map(({ Icon, top, left, rotate, delay }, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 10, rotate: 0 }}
+              animate={{ opacity: 1, y: 0, rotate }}
+              transition={{ delay, duration: 0.4 }}
+              className="absolute w-11 h-11 rounded-xl bg-white/10 border border-white/20 backdrop-blur-sm shadow-md shadow-black/20 flex items-center justify-center text-emerald-300"
+              style={{ top, left }}
+            >
+              <Icon size={18} />
+            </motion.div>
+          ))}
 
           {/* Welcome copy */}
           <div className="relative z-10">
@@ -206,7 +192,7 @@ export default function LoginPage() {
         {/* ── RIGHT: white form panel ── */}
         <div className="flex-1 bg-white flex flex-col overflow-hidden">
           {/* Accent bar */}
-          <div className="h-1.5 w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 shrink-0" />
+          <div className="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 shrink-0" />
 
           <div className="flex-1 flex items-center justify-center px-10 py-8">
             <div className="w-full max-w-[310px]">
@@ -220,9 +206,7 @@ export default function LoginPage() {
                     transition={{ duration: 0.25 }}
                   >
                     <div className="mb-7">
-                      <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-200 mb-4 text-white">
-                        <SunriseLogo size={22} />
-                      </div>
+                      <Logo size={40} className="mb-4" />
                       <h2 className="text-2xl font-black text-gray-800">Sign In</h2>
                       <p className="text-[13px] text-gray-400 mt-1">Welcome back — enter your details below</p>
                     </div>
@@ -232,16 +216,13 @@ export default function LoginPage() {
                         <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Email</label>
                         <div className="relative">
                           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
+                            <Mail size={16} strokeWidth={1.8} />
                           </span>
                           <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                             placeholder="you@example.com" required
                             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-700
                                        placeholder:text-gray-300 bg-gray-50/60
-                                       focus:outline-none focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-100 transition-all" />
+                                       focus:outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all" />
                         </div>
                       </div>
 
@@ -249,47 +230,42 @@ export default function LoginPage() {
                         <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Password</label>
                         <div className="relative">
                           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                            </svg>
+                            <Lock size={16} strokeWidth={1.8} />
                           </span>
                           <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
                             placeholder="••••••••" required
                             className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl text-sm text-gray-700
                                        placeholder:text-gray-300 bg-gray-50/60
-                                       focus:outline-none focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-100 transition-all" />
+                                       focus:outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all" />
                           <button type="button" onClick={() => setShowPassword(v => !v)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-amber-500 transition-colors">
-                            {showPassword
-                              ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                              : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            }
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-500 transition-colors">
+                            {showPassword ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
                           </button>
                         </div>
                       </div>
 
                       <div className="flex items-center justify-end">
                         <button type="button" onClick={() => switchView('reset')}
-                          className="text-[12px] text-amber-600 hover:text-amber-700 font-semibold transition-colors">
+                          className="text-[12px] text-emerald-600 hover:text-emerald-700 font-semibold transition-colors">
                           Forgot password?
                         </button>
                       </div>
 
                       {errorMsg && (
                         <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                          className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-xl">
-                          {errorMsg}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-xl">
+                          <AlertCircle size={14} className="shrink-0" /> {errorMsg}
                         </motion.p>
                       )}
 
                       <motion.button type="submit" disabled={loggingIn}
-                        whileHover={{ scale: 1.015, boxShadow: '0 8px 28px rgba(217,119,6,0.4)' }}
+                        whileHover={{ scale: 1.015, boxShadow: '0 8px 28px rgba(5,150,105,0.4)' }}
                         whileTap={{ scale: 0.985 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                        className="w-full py-3 mt-1 bg-gradient-to-r from-amber-500 to-orange-600 text-white text-sm font-bold
-                                   rounded-xl shadow-lg shadow-amber-200 transition-all disabled:opacity-60 cursor-pointer">
-                        {loggingIn ? 'Signing in…' : 'Sign In →'}
+                        className="w-full py-3 mt-1 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white text-sm font-bold
+                                   rounded-xl shadow-lg shadow-emerald-200 transition-all disabled:opacity-60 cursor-pointer
+                                   flex items-center justify-center gap-1.5">
+                        {loggingIn ? 'Signing in…' : <>Sign In <ArrowRight size={15} /></>}
                       </motion.button>
                     </form>
                   </motion.div>
@@ -302,11 +278,8 @@ export default function LoginPage() {
                     transition={{ duration: 0.25 }}
                   >
                     <div className="mb-7">
-                      <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-200 mb-4">
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                        </svg>
+                      <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200 mb-4 text-white">
+                        <KeyRound size={20} strokeWidth={2} />
                       </div>
                       <h2 className="text-2xl font-black text-gray-800">Reset Password</h2>
                       <p className="text-[13px] text-gray-400 mt-1">Enter your email and choose a new password</p>
@@ -317,16 +290,13 @@ export default function LoginPage() {
                         <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Email</label>
                         <div className="relative">
                           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
+                            <Mail size={16} strokeWidth={1.8} />
                           </span>
                           <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                             placeholder="you@example.com" required
                             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-700
                                        placeholder:text-gray-300 bg-gray-50/60
-                                       focus:outline-none focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-100 transition-all" />
+                                       focus:outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all" />
                         </div>
                       </div>
 
@@ -334,22 +304,16 @@ export default function LoginPage() {
                         <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">New Password</label>
                         <div className="relative">
                           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                            </svg>
+                            <Lock size={16} strokeWidth={1.8} />
                           </span>
                           <input type={showNewPass ? 'text' : 'password'} value={newPass} onChange={e => setNewPass(e.target.value)}
                             placeholder="••••••••" required minLength={6}
                             className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl text-sm text-gray-700
                                        placeholder:text-gray-300 bg-gray-50/60
-                                       focus:outline-none focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-100 transition-all" />
+                                       focus:outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all" />
                           <button type="button" onClick={() => setShowNewPass(v => !v)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-amber-500 transition-colors">
-                            {showNewPass
-                              ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                              : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            }
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-500 transition-colors">
+                            {showNewPass ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
                           </button>
                         </div>
                       </div>
@@ -358,53 +322,46 @@ export default function LoginPage() {
                         <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Confirm Password</label>
                         <div className="relative">
                           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                            <CheckCircle2 size={16} strokeWidth={1.8} />
                           </span>
                           <input type={showConfirm ? 'text' : 'password'} value={confirmPass} onChange={e => setConfirmPass(e.target.value)}
                             placeholder="••••••••" required minLength={6}
                             className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl text-sm text-gray-700
                                        placeholder:text-gray-300 bg-gray-50/60
-                                       focus:outline-none focus:border-amber-400 focus:bg-white focus:ring-2 focus:ring-amber-100 transition-all" />
+                                       focus:outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all" />
                           <button type="button" onClick={() => setShowConfirm(v => !v)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-amber-500 transition-colors">
-                            {showConfirm
-                              ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                              : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            }
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-500 transition-colors">
+                            {showConfirm ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
                           </button>
                         </div>
                       </div>
 
                       {errorMsg && (
                         <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                          className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-xl">
-                          {errorMsg}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-xl">
+                          <AlertCircle size={14} className="shrink-0" /> {errorMsg}
                         </motion.p>
                       )}
                       {successMsg && (
                         <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                          className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-xl">
-                          {successMsg}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-xl">
+                          <CheckCircle2 size={14} className="shrink-0" /> {successMsg}
                         </motion.p>
                       )}
 
                       <motion.button type="submit" disabled={resetting}
-                        whileHover={{ scale: 1.015, boxShadow: '0 8px 28px rgba(217,119,6,0.4)' }}
+                        whileHover={{ scale: 1.015, boxShadow: '0 8px 28px rgba(5,150,105,0.4)' }}
                         whileTap={{ scale: 0.985 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                        className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white text-sm font-bold
-                                   rounded-xl shadow-lg shadow-amber-200 transition-all disabled:opacity-60 cursor-pointer">
-                        {resetting ? 'Resetting…' : 'Reset Password →'}
+                        className="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white text-sm font-bold
+                                   rounded-xl shadow-lg shadow-emerald-200 transition-all disabled:opacity-60 cursor-pointer
+                                   flex items-center justify-center gap-1.5">
+                        {resetting ? 'Resetting…' : <>Reset Password <ArrowRight size={15} /></>}
                       </motion.button>
 
                       <button type="button" onClick={() => switchView('login')}
-                        className="w-full py-2 text-[12px] text-gray-400 hover:text-amber-600 font-medium transition-colors flex items-center justify-center gap-1">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
+                        className="w-full py-2 text-[12px] text-gray-400 hover:text-emerald-600 font-medium transition-colors flex items-center justify-center gap-1">
+                        <ArrowLeft size={14} strokeWidth={2} />
                         Back to Sign In
                       </button>
                     </form>

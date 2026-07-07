@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Horizon - HAWB Manifest Tool",
-  description: "Horizon - Jobs & Manifests",
+  title: "Horizon Express - HAWB Manifest Tool",
+  description: "Horizon Express - Jobs & Manifests",
 };
 
 // Sets the dark class on <html> before hydration so there's no flash of the
