@@ -92,6 +92,9 @@ export default function JobDetailPage() {
   }
 
   const locked = job.locked;
+  const multiPackage = job.packages.length > 1;
+  const packagesHaveDetail = job.packages.some(p => p.temperature_range || p.dimensions);
+  const showCombinedTempDims = !multiPackage || !packagesHaveDetail;
 
   const save = async (field: string, value: unknown) => {
     if (locked) return;
@@ -332,20 +335,22 @@ export default function JobDetailPage() {
                   className={inputClass(locked)} />
               </Field>
 
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Temperature Range">
-                  <input disabled={locked} value={form.temperature_range}
-                    onChange={e => setForm(f => ({ ...f, temperature_range: e.target.value }))}
-                    onBlur={e => save('temperature_range', e.target.value || null)}
-                    className={inputClass(locked)} />
-                </Field>
-                <Field label="Dimensions (cm)">
-                  <input disabled={locked} value={form.dimensions}
-                    onChange={e => setForm(f => ({ ...f, dimensions: e.target.value }))}
-                    onBlur={e => save('dimensions', e.target.value || null)}
-                    className={inputClass(locked)} />
-                </Field>
-              </div>
+              {showCombinedTempDims && (
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Temperature Range">
+                    <input disabled={locked} value={form.temperature_range}
+                      onChange={e => setForm(f => ({ ...f, temperature_range: e.target.value }))}
+                      onBlur={e => save('temperature_range', e.target.value || null)}
+                      className={inputClass(locked)} />
+                  </Field>
+                  <Field label="Dimensions (cm)">
+                    <input disabled={locked} value={form.dimensions}
+                      onChange={e => setForm(f => ({ ...f, dimensions: e.target.value }))}
+                      onBlur={e => save('dimensions', e.target.value || null)}
+                      className={inputClass(locked)} />
+                  </Field>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Volumetric Weight (kg)">
@@ -390,15 +395,42 @@ export default function JobDetailPage() {
               </Field>
 
               {job.packages.length > 0 && (
-                <Field label="Package Lines">
-                  <div className="space-y-1.5">
-                    {job.packages.map((p, i) => (
-                      <div key={i} className="text-[12px] text-gray-700 dark:text-slate-300 bg-gray-50/60 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700 rounded-lg px-3 py-2">
-                        {[p.supplier, p.package_type, p.weight_kg != null ? `${p.weight_kg} kg` : null, p.content_description]
-                          .filter(Boolean).join(' · ')}
-                      </div>
-                    ))}
-                  </div>
+                <Field label={`Packages (${job.packages.length})`}>
+                  {multiPackage && packagesHaveDetail ? (
+                    <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-slate-800">
+                      <table className="w-full text-[11.5px]">
+                        <thead>
+                          <tr className="bg-gray-50/80 dark:bg-slate-800/60 text-gray-400 dark:text-slate-500 uppercase tracking-wide text-[10px]">
+                            <th className="text-left font-bold px-3 py-2">Type</th>
+                            <th className="text-right font-bold px-3 py-2">Weight</th>
+                            <th className="text-left font-bold px-3 py-2">Temp</th>
+                            <th className="text-left font-bold px-3 py-2">Dims (cm)</th>
+                            <th className="text-left font-bold px-3 py-2">Content</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                          {job.packages.map((p, i) => (
+                            <tr key={i} className="text-gray-700 dark:text-slate-300">
+                              <td className="px-3 py-2 font-semibold whitespace-nowrap">{[p.supplier, p.package_type].filter(Boolean).join(' ') || '—'}</td>
+                              <td className="px-3 py-2 text-right whitespace-nowrap">{p.weight_kg != null ? `${p.weight_kg} kg` : '—'}</td>
+                              <td className="px-3 py-2 whitespace-nowrap">{p.temperature_range || '—'}</td>
+                              <td className="px-3 py-2 whitespace-nowrap">{p.dimensions || '—'}</td>
+                              <td className="px-3 py-2">{p.content_description || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {job.packages.map((p, i) => (
+                        <div key={i} className="text-[12px] text-gray-700 dark:text-slate-300 bg-gray-50/60 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700 rounded-lg px-3 py-2">
+                          {[p.supplier, p.package_type, p.weight_kg != null ? `${p.weight_kg} kg` : null, p.content_description]
+                            .filter(Boolean).join(' · ')}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </Field>
               )}
             </div>

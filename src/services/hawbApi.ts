@@ -5,6 +5,8 @@ export interface HawbPackageLine {
   package_type?: string | null;
   weight_kg?: number | null;
   content_description?: string | null;
+  temperature_range?: string | null;
+  dimensions?: string | null;
 }
 
 export interface HawbJob {
@@ -39,6 +41,7 @@ export interface HawbJob {
   extracted_data: Record<string, unknown>;
   status: 'pending_review' | 'ready_to_manifest' | 'manifested';
   manifest_id: string | null;
+  manifest_sequence: number | null;
   locked: boolean;
   ready_at: string | null;
   manifested_at: string | null;
@@ -109,7 +112,10 @@ export interface HawbManifest {
   reference_number: string;
   job_count: number;
   total_weight_kg: number;
+  status: 'draft' | 'exported';
+  exported_at: string | null;
   created_by: string;
+  created_by_name: string | null;
   created_at: string;
 }
 
@@ -154,6 +160,22 @@ export const hawbApi = api.injectEndpoints({
         { type: 'HawbJob', id: jobId }, 'HawbJob',
       ],
     }),
+    addJobsToManifest: build.mutation<HawbManifestDetail, { manifestId: string; job_ids: string[] }>({
+      query: ({ manifestId, job_ids }) => ({ url: `/hawb/manifests/${manifestId}/jobs/add`, method: 'POST', body: { job_ids } }),
+      invalidatesTags: (_r, _e, { manifestId }) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest', 'HawbJob'],
+    }),
+    reorderManifestJobs: build.mutation<HawbJob[], { manifestId: string; job_ids: string[] }>({
+      query: ({ manifestId, job_ids }) => ({ url: `/hawb/manifests/${manifestId}/jobs/reorder`, method: 'PATCH', body: { job_ids } }),
+      invalidatesTags: (_r, _e, { manifestId }) => [{ type: 'HawbManifest', id: manifestId }],
+    }),
+    exportManifest: build.mutation<Blob, string>({
+      query: (manifestId) => ({
+        url: `/hawb/manifests/${manifestId}/export`,
+        method: 'POST',
+        responseHandler: (response) => response.blob(),
+      }),
+      invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }],
+    }),
   }),
   overrideExisting: false,
 });
@@ -167,4 +189,7 @@ export const {
   useGetHawbManifestQuery,
   useCreateHawbManifestMutation,
   useRemoveHawbJobFromManifestMutation,
+  useAddJobsToManifestMutation,
+  useReorderManifestJobsMutation,
+  useExportManifestMutation,
 } = hawbApi;

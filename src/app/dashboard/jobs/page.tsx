@@ -7,6 +7,7 @@ import { FileText, Package, TriangleAlert } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import { useGetHawbJobsQuery, useCreateHawbManifestMutation, type HawbJob } from '@/services/hawbApi';
 import ApiErrorState from '@/components/ApiErrorState';
+import { splitAddress } from '@/lib/hawbFormat';
 
 const STATUS_TABS: { key: string; label: string }[] = [
   { key: '', label: 'All' },
@@ -26,12 +27,6 @@ const STATUS_LABEL: Record<string, string> = {
   ready_to_manifest: 'Ready to Manifest',
   manifested: 'Manifested',
 };
-
-function splitAddress(value: string | null): { name: string; address: string } {
-  if (!value) return { name: '—', address: '' };
-  const [first, ...rest] = value.split('\n').map(s => s.trim()).filter(Boolean);
-  return { name: first ?? '—', address: rest.join(', ') };
-}
 
 function PartyCell({ value }: { value: string | null }) {
   const { name, address } = splitAddress(value);
