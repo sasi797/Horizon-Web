@@ -43,7 +43,7 @@ export default function LoginPage() {
       });
       const user = await res.json();
       dispatch(setCredentials({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token, user }));
-      router.push('/dashboard/jobs');
+      router.push('/dashboard/manifests');
     } catch {
       setErrorMsg('Invalid email or password');
     }

@@ -60,11 +60,6 @@ export interface HawbDocument {
   error_message: string | null;
 }
 
-export interface HawbJobDetail extends HawbJob {
-  document: HawbDocument;
-  pdf_url: string;
-}
-
 export interface HawbJobUpdate {
   shipper?: string | null;
   consignee?: string | null;
@@ -91,22 +86,6 @@ export interface HawbJobUpdate {
   special_handling?: string | null;
 }
 
-export interface HawbJobPage {
-  items: HawbJob[];
-  total: number;
-  page: number;
-  page_size: number;
-  total_pages: number;
-}
-
-export interface HawbJobListParams {
-  status?: string;
-  search?: string;
-  document_id?: string;
-  page?: number;
-  page_size?: number;
-}
-
 export interface HawbManifest {
   id: string;
   reference_number: string;
@@ -114,32 +93,29 @@ export interface HawbManifest {
   total_weight_kg: number;
   status: 'draft' | 'exported';
   exported_at: string | null;
-  created_by: string;
+  start_point: string | null;
+  end_point: string | null;
+  created_by: string | null;
   created_by_name: string | null;
   created_at: string;
 }
 
+export interface HawbManifestUpdate {
+  start_point?: string | null;
+  end_point?: string | null;
+}
+
 export interface HawbManifestDetail extends HawbManifest {
   jobs: HawbJob[];
+  document: HawbDocument;
+  pdf_url: string;
 }
 
 export const hawbApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getHawbJobs: build.query<HawbJobPage, HawbJobListParams>({
-      query: (params) => ({ url: '/hawb/jobs', params }),
-      providesTags: ['HawbJob'],
-    }),
-    getHawbJob: build.query<HawbJobDetail, string>({
-      query: (id) => `/hawb/jobs/${id}`,
-      providesTags: (_r, _e, id) => [{ type: 'HawbJob', id }],
-    }),
     updateHawbJob: build.mutation<HawbJob, { id: string; body: HawbJobUpdate }>({
       query: ({ id, body }) => ({ url: `/hawb/jobs/${id}`, method: 'PATCH', body }),
       invalidatesTags: (_r, _e, { id }) => [{ type: 'HawbJob', id }, 'HawbJob'],
-    }),
-    markHawbJobReady: build.mutation<HawbJob, string>({
-      query: (id) => ({ url: `/hawb/jobs/${id}/ready`, method: 'POST' }),
-      invalidatesTags: (_r, _e, id) => [{ type: 'HawbJob', id }, 'HawbJob'],
     }),
     getHawbManifests: build.query<HawbManifest[], void>({
       query: () => '/hawb/manifests',
@@ -149,20 +125,9 @@ export const hawbApi = api.injectEndpoints({
       query: (id) => `/hawb/manifests/${id}`,
       providesTags: (_r, _e, id) => [{ type: 'HawbManifest', id }],
     }),
-    createHawbManifest: build.mutation<HawbManifestDetail, string[]>({
-      query: (job_ids) => ({ url: '/hawb/manifests', method: 'POST', body: { job_ids } }),
-      invalidatesTags: ['HawbManifest', 'HawbJob'],
-    }),
-    removeHawbJobFromManifest: build.mutation<HawbJob, { manifestId: string; jobId: string }>({
-      query: ({ manifestId, jobId }) => ({ url: `/hawb/manifests/${manifestId}/jobs/${jobId}/remove`, method: 'POST' }),
-      invalidatesTags: (_r, _e, { manifestId, jobId }) => [
-        { type: 'HawbManifest', id: manifestId }, 'HawbManifest',
-        { type: 'HawbJob', id: jobId }, 'HawbJob',
-      ],
-    }),
-    addJobsToManifest: build.mutation<HawbManifestDetail, { manifestId: string; job_ids: string[] }>({
-      query: ({ manifestId, job_ids }) => ({ url: `/hawb/manifests/${manifestId}/jobs/add`, method: 'POST', body: { job_ids } }),
-      invalidatesTags: (_r, _e, { manifestId }) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest', 'HawbJob'],
+    updateHawbManifest: build.mutation<HawbManifest, { id: string; body: HawbManifestUpdate }>({
+      query: ({ id, body }) => ({ url: `/hawb/manifests/${id}`, method: 'PATCH', body }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: 'HawbManifest', id }, 'HawbManifest'],
     }),
     reorderManifestJobs: build.mutation<HawbJob[], { manifestId: string; job_ids: string[] }>({
       query: ({ manifestId, job_ids }) => ({ url: `/hawb/manifests/${manifestId}/jobs/reorder`, method: 'PATCH', body: { job_ids } }),
@@ -181,15 +146,10 @@ export const hawbApi = api.injectEndpoints({
 });
 
 export const {
-  useGetHawbJobsQuery,
-  useGetHawbJobQuery,
   useUpdateHawbJobMutation,
-  useMarkHawbJobReadyMutation,
   useGetHawbManifestsQuery,
   useGetHawbManifestQuery,
-  useCreateHawbManifestMutation,
-  useRemoveHawbJobFromManifestMutation,
-  useAddJobsToManifestMutation,
+  useUpdateHawbManifestMutation,
   useReorderManifestJobsMutation,
   useExportManifestMutation,
 } = hawbApi;

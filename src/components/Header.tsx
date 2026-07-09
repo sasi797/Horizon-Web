@@ -9,9 +9,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import Tooltip from '@/components/Tooltip';
 
 const PATH_TITLES: { match: (p: string) => boolean; title: string; sub: string }[] = [
-  { match: p => /^\/dashboard\/jobs\/.+/.test(p),      title: 'Job Detail',      sub: 'Extracted data & source PDF' },
-  { match: p => p.startsWith('/dashboard/jobs'),       title: 'Jobs',            sub: 'HAWB jobs awaiting review'   },
-  { match: p => /^\/dashboard\/manifests\/.+/.test(p), title: 'Manifest Detail', sub: 'Locked shipment group'       },
+  { match: p => /^\/dashboard\/manifests\/.+/.test(p), title: 'Manifest Detail', sub: 'Source PDF & HAWB details'    },
   { match: p => p.startsWith('/dashboard/manifests'),  title: 'Manifests',       sub: 'Grouped, reference-numbered' },
 ];
 

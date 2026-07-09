@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
-  FileText,
   PackageCheck,
   LogOut,
 } from 'lucide-react';
@@ -16,7 +15,6 @@ import { logout } from '@/store/slices/authSlice';
 import { useLogoutMutation } from '@/services/authApi';
 
 const navItems = [
-  { label: 'Jobs',      href: '/dashboard/jobs',      icon: FileText },
   { label: 'Manifests', href: '/dashboard/manifests', icon: PackageCheck },
 ];
 

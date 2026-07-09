@@ -2,21 +2,18 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { GripVertical, X, Plus, Download, ChevronDown, TriangleAlert } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronRight, Download, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Truck, GripVertical, ArrowLeftRight, Ruler, Banknote } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestQuery,
-  useGetHawbJobsQuery,
-  useRemoveHawbJobFromManifestMutation,
-  useAddJobsToManifestMutation,
+  useUpdateHawbManifestMutation,
+  useUpdateHawbJobMutation,
   useReorderManifestJobsMutation,
   useExportManifestMutation,
   type HawbJob,
 } from '@/services/hawbApi';
 import ApiErrorState from '@/components/ApiErrorState';
-import Modal from '@/components/Modal';
-import Tooltip from '@/components/Tooltip';
 import { splitAddress, cityLine } from '@/lib/hawbFormat';
 
 const MANIFEST_STATUS_BADGE: Record<string, string> = {
@@ -37,8 +34,13 @@ function formatTime(value: string): string {
   return new Date(value).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
+function toDatetimeLocal(value: string | null): string {
+  if (!value) return '';
+  return value.slice(0, 16);
+}
+
 function initials(name: string | null): string {
-  if (!name) return '—';
+  if (!name) return 'System';
   return name.split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
 
@@ -48,36 +50,106 @@ function routeLine(job: HawbJob): string {
   return `${shipper.name} · ${cityLine(job.shipper)} → ${consignee.name} · ${cityLine(job.consignee)}`;
 }
 
+function pageRangeLabel(job: HawbJob): string | null {
+  if (job.page_start == null) return null;
+  const count = job.packages.length || 1;
+  const end = job.page_start + count - 1;
+  return count > 1 ? `Pages ${job.page_start}–${end}` : `Page ${job.page_start}`;
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-[10px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide mb-1.5">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function inputClass(locked: boolean) {
+  return `w-full text-[13px] border border-gray-200 dark:border-navy-700 rounded-xl px-3 py-2 bg-gray-50/60 dark:bg-navy-800/60 text-gray-700 dark:text-gray-200 focus:outline-none focus:border-emerald-300 dark:focus:border-emerald-600 focus:bg-white dark:focus:bg-navy-800 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/40 transition-all ${
+    locked ? 'opacity-60 cursor-not-allowed' : ''
+  }`;
+}
+
+type JobForm = {
+  shipper: string; consignee: string; collection_at: string; delivery_at: string;
+  package_qty: string; weight_kg: string; dangerous_goods: boolean; dangerous_goods_notes: string;
+  client_account: string; package_sequence: string;
+  shipper_contact: string; shipper_phone: string; shipper_reference: string;
+  consignee_contact: string; consignee_phone: string; consignee_reference: string;
+  temperature_range: string; dimensions: string; volumetric_weight_kg: string;
+  declared_value: string; declared_value_currency: string; direction: string; special_handling: string;
+};
+
+function formFromJob(job: HawbJob): JobForm {
+  return {
+    shipper: job.shipper ?? '',
+    consignee: job.consignee ?? '',
+    collection_at: toDatetimeLocal(job.collection_at),
+    delivery_at: toDatetimeLocal(job.delivery_at),
+    package_qty: job.package_qty?.toString() ?? '',
+    weight_kg: job.weight_kg?.toString() ?? '',
+    dangerous_goods: job.dangerous_goods,
+    dangerous_goods_notes: job.dangerous_goods_notes ?? '',
+    client_account: job.client_account ?? '',
+    package_sequence: job.package_sequence ?? '',
+    shipper_contact: job.shipper_contact ?? '',
+    shipper_phone: job.shipper_phone ?? '',
+    shipper_reference: job.shipper_reference ?? '',
+    consignee_contact: job.consignee_contact ?? '',
+    consignee_phone: job.consignee_phone ?? '',
+    consignee_reference: job.consignee_reference ?? '',
+    temperature_range: job.temperature_range ?? '',
+    dimensions: job.dimensions ?? '',
+    volumetric_weight_kg: job.volumetric_weight_kg?.toString() ?? '',
+    declared_value: job.declared_value?.toString() ?? '',
+    declared_value_currency: job.declared_value_currency ?? '',
+    direction: job.direction ?? '',
+    special_handling: job.special_handling ?? '',
+  };
+}
+
 export default function ManifestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
   const { data: manifest, isLoading, isError, refetch } = useGetHawbManifestQuery(id);
-  const [removeJob] = useRemoveHawbJobFromManifestMutation();
-  const [addJobs, { isLoading: adding }] = useAddJobsToManifestMutation();
+  const [updateManifest] = useUpdateHawbManifestMutation();
+  const [updateJob] = useUpdateHawbJobMutation();
   const [reorderJobs] = useReorderManifestJobsMutation();
   const [exportManifest, { isLoading: exporting }] = useExportManifestMutation();
 
   const [orderedJobs, setOrderedJobs] = useState<HawbJob[]>([]);
   const [syncedJobs, setSyncedJobs] = useState<HawbJob[] | undefined>(undefined);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [addModalOpen, setAddModalOpen] = useState(false);
-  const [selectedToAdd, setSelectedToAdd] = useState<Set<string>>(new Set());
+  const [cardDesign, setCardDesign] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [jobForm, setJobForm] = useState<JobForm | null>(null);
+  const [syncedFormFor, setSyncedFormFor] = useState<string | null>(null);
+  const [points, setPoints] = useState({ start_point: '', end_point: '' });
+  const [syncedPointsFor, setSyncedPointsFor] = useState<string | undefined>(undefined);
 
   if (manifest && manifest.jobs !== syncedJobs) {
     setSyncedJobs(manifest.jobs);
     setOrderedJobs(manifest.jobs);
   }
-
-  const { data: readyPage } = useGetHawbJobsQuery(
-    { status: 'ready_to_manifest', page_size: 100 },
-    { skip: !addModalOpen }
-  );
-  const { data: pendingPage } = useGetHawbJobsQuery(
-    { status: 'pending_review', page_size: 100 },
-    { skip: !addModalOpen }
-  );
-  const addableJobs = [...(readyPage?.items ?? []), ...(pendingPage?.items ?? [])];
+  if (manifest && syncedPointsFor !== manifest.id) {
+    setSyncedPointsFor(manifest.id);
+    setPoints({ start_point: manifest.start_point ?? '', end_point: manifest.end_point ?? '' });
+  }
+  if (selectedJobId === null && orderedJobs.length > 0) {
+    setSelectedJobId(orderedJobs[0].id);
+  }
+  const selectedJob = orderedJobs.find(j => j.id === selectedJobId) ?? orderedJobs[0] ?? null;
+  if (selectedJob && syncedFormFor !== selectedJob.id) {
+    setSyncedFormFor(selectedJob.id);
+    setJobForm(formFromJob(selectedJob));
+  }
+  if (!selectedJob && syncedFormFor !== null) {
+    setSyncedFormFor(null);
+    setJobForm(null);
+  }
 
   if (isLoading) {
     return <div className="h-64 bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 animate-pulse" />;
@@ -98,16 +170,6 @@ export default function ManifestDetailPage() {
     }
   };
 
-  const handleSortByCollectionTime = () => {
-    const sorted = [...orderedJobs].sort((a, b) => {
-      if (!a.collection_at) return 1;
-      if (!b.collection_at) return -1;
-      return new Date(a.collection_at).getTime() - new Date(b.collection_at).getTime();
-    });
-    setOrderedJobs(sorted);
-    persistOrder(sorted);
-  };
-
   const handleDrop = () => {
     setDragIndex(null);
     persistOrder(orderedJobs);
@@ -124,30 +186,21 @@ export default function ManifestDetailPage() {
     setDragIndex(index);
   };
 
-  const handleRemove = async (jobId: string) => {
+  const savePoint = async (field: 'start_point' | 'end_point', value: string) => {
+    if (locked) return;
     try {
-      await removeJob({ manifestId: manifest.id, jobId }).unwrap();
+      await updateManifest({ id: manifest.id, body: { [field]: value || null } }).unwrap();
     } catch {
-      // no-op
+      // reverts to server value on next refetch
     }
   };
 
-  const toggleAddSelection = (jobId: string) => {
-    setSelectedToAdd(prev => {
-      const next = new Set(prev);
-      if (next.has(jobId)) next.delete(jobId); else next.add(jobId);
-      return next;
-    });
-  };
-
-  const handleAddJobs = async () => {
-    if (selectedToAdd.size === 0) return;
+  const saveJobField = async (jobId: string, field: string, value: unknown) => {
+    if (locked) return;
     try {
-      await addJobs({ manifestId: manifest.id, job_ids: Array.from(selectedToAdd) }).unwrap();
-      setSelectedToAdd(new Set());
-      setAddModalOpen(false);
+      await updateJob({ id: jobId, body: { [field]: value } }).unwrap();
     } catch {
-      // no-op
+      // reverts to server value on next refetch
     }
   };
 
@@ -165,6 +218,10 @@ export default function ManifestDetailPage() {
     }
   };
 
+  const multiPackage = selectedJob ? selectedJob.packages.length > 1 : false;
+  const packagesHaveDetail = selectedJob ? selectedJob.packages.some(p => p.temperature_range || p.dimensions) : false;
+  const showCombinedTempDims = !multiPackage || !packagesHaveDetail;
+
   return (
     <motion.div variants={pageTransition} initial="hidden" animate="visible" className="space-y-4">
       <motion.div variants={staggerItem} className="flex items-start gap-3">
@@ -181,7 +238,7 @@ export default function ManifestDetailPage() {
             </span>
           </div>
           <p className="text-[11px] text-gray-400 dark:text-navy-500 mt-0.5">
-            Created {formatDate(manifest.created_at)} · operator {initials(manifest.created_by_name)} ·{' '}
+            {manifest.document.filename} · Created {formatDate(manifest.created_at)} · operator {initials(manifest.created_by_name)} ·{' '}
             {manifest.exported_at ? `exported ${formatDate(manifest.exported_at)}` : 'not yet exported'}
           </p>
         </div>
@@ -201,168 +258,665 @@ export default function ManifestDetailPage() {
         ))}
       </motion.div>
 
-      <motion.div variants={staggerItem} className="flex items-center justify-between">
-        <div>
-          <h2 className="text-[12px] font-bold text-gray-700 dark:text-navy-200">Run order</h2>
-          <p className="text-[10.5px] text-gray-400 dark:text-navy-500">
-            {locked ? 'Manifest is exported and locked' : 'Drag to reorder — sets the driver\'s sequence'}
-          </p>
+      <motion.div variants={staggerItem} className="grid grid-cols-2 gap-3">
+        <div className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm px-4 py-3">
+          <Field label="Start point">
+            <input
+              disabled={locked}
+              value={points.start_point}
+              onChange={e => setPoints(p => ({ ...p, start_point: e.target.value }))}
+              onBlur={e => savePoint('start_point', e.target.value)}
+              placeholder="Collection start location"
+              className={inputClass(locked)}
+            />
+          </Field>
         </div>
-        <button
-          onClick={handleSortByCollectionTime}
-          disabled={locked}
-          className="flex items-center gap-1 text-[11px] font-bold text-gray-500 dark:text-navy-400 bg-gray-50 dark:bg-navy-800 hover:bg-gray-100 dark:hover:bg-navy-700 disabled:opacity-40 px-3 py-1.5 rounded-lg transition-colors"
-        >
-          Sort: collection time <ChevronDown size={12} />
-        </button>
+        <div className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm px-4 py-3">
+          <Field label="End point">
+            <input
+              disabled={locked}
+              value={points.end_point}
+              onChange={e => setPoints(p => ({ ...p, end_point: e.target.value }))}
+              onBlur={e => savePoint('end_point', e.target.value)}
+              placeholder="Final delivery location"
+              className={inputClass(locked)}
+            />
+          </Field>
+        </div>
       </motion.div>
 
-      <motion.div variants={staggerItem} className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b border-gray-100 dark:border-navy-800">
-              {['Order', 'Job & route', 'Collection', 'Packages', 'DG', ''].map(h => (
-                <th key={h} className="px-4 py-3 text-[10px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wider whitespace-nowrap">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50 dark:divide-navy-800/70">
-            {orderedJobs.map((job, index) => (
-              <tr
-                key={job.id}
-                draggable={!locked}
-                onDragStart={() => setDragIndex(index)}
-                onDragOver={e => { e.preventDefault(); handleDragOver(index); }}
-                onDrop={handleDrop}
-                className="hover:bg-gray-50/70 dark:hover:bg-navy-800/50 transition-colors"
+      <motion.div variants={staggerItem} className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[600px]">
+        {/* Job details pane — synced to the run order row selected on the left */}
+        <div className="order-2 h-[70vh] lg:h-auto flex flex-col gap-2">
+          <div className="flex items-center justify-between px-1 shrink-0">
+            <p className="text-[11px] font-bold text-gray-500 dark:text-navy-400">Job details</p>
+            <div className="flex items-center gap-2">
+              {selectedJob && (
+                <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full">
+                  <FileText size={11} /> {selectedJob.hawb_number} · {pageRangeLabel(selectedJob) ?? 'Page 1'}
+                </span>
+              )}
+              <button
+                onClick={() => window.open(manifest.pdf_url, '_blank', 'noopener,noreferrer')}
+                title="View full PDF in a new tab"
+                className="flex items-center gap-1 text-[10.5px] font-bold text-gray-500 dark:text-navy-400 bg-gray-50 dark:bg-navy-800 hover:bg-gray-100 dark:hover:bg-navy-700 px-2 py-0.5 rounded-full transition-colors"
               >
-                <td className="px-4 py-3.5 whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    {!locked && <GripVertical size={14} className="text-gray-300 dark:text-navy-600 cursor-grab" />}
-                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-navy-800 dark:bg-navy-700 text-white text-[11px] font-bold">
-                      {index + 1}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-4 py-3.5 max-w-[280px]">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[12px]">{job.hawb_number}</span>
-                    {job.client_account && (
-                      <span className="text-[9px] font-bold text-gray-500 dark:text-navy-400 bg-gray-100 dark:bg-navy-800 px-1.5 py-0.5 rounded-full">
-                        {job.client_account}
-                      </span>
+                <ExternalLink size={11} /> View PDF
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm px-4 py-4">
+            <AnimatePresence mode="wait">
+            {selectedJob && jobForm ? (
+              <motion.div
+                key={selectedJob.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                className="space-y-4"
+              >
+                <Field label="Shipper">
+                  <textarea
+                    disabled={locked}
+                    value={jobForm.shipper}
+                    onChange={e => setJobForm(f => f && ({ ...f, shipper: e.target.value }))}
+                    onBlur={e => saveJobField(selectedJob.id, 'shipper', e.target.value || null)}
+                    rows={5}
+                    className={inputClass(locked)}
+                  />
+                </Field>
+
+                <Field label="Consignee">
+                  <textarea
+                    disabled={locked}
+                    value={jobForm.consignee}
+                    onChange={e => setJobForm(f => f && ({ ...f, consignee: e.target.value }))}
+                    onBlur={e => saveJobField(selectedJob.id, 'consignee', e.target.value || null)}
+                    rows={5}
+                    className={inputClass(locked)}
+                  />
+                </Field>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Collection">
+                    <input
+                      type="datetime-local"
+                      disabled={locked}
+                      value={jobForm.collection_at}
+                      onChange={e => setJobForm(f => f && ({ ...f, collection_at: e.target.value }))}
+                      onBlur={e => saveJobField(selectedJob.id, 'collection_at', e.target.value ? `${e.target.value}:00` : null)}
+                      className={inputClass(locked)}
+                    />
+                  </Field>
+                  <Field label="Delivery">
+                    <input
+                      type="datetime-local"
+                      disabled={locked}
+                      value={jobForm.delivery_at}
+                      onChange={e => setJobForm(f => f && ({ ...f, delivery_at: e.target.value }))}
+                      onBlur={e => saveJobField(selectedJob.id, 'delivery_at', e.target.value ? `${e.target.value}:00` : null)}
+                      className={inputClass(locked)}
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Package Qty">
+                    <input
+                      type="number"
+                      disabled={locked}
+                      value={jobForm.package_qty}
+                      onChange={e => setJobForm(f => f && ({ ...f, package_qty: e.target.value }))}
+                      onBlur={e => saveJobField(selectedJob.id, 'package_qty', e.target.value ? Number(e.target.value) : null)}
+                      className={inputClass(locked)}
+                    />
+                  </Field>
+                  <Field label="Weight (kg)">
+                    <input
+                      type="number"
+                      step="0.01"
+                      disabled={locked}
+                      value={jobForm.weight_kg}
+                      onChange={e => setJobForm(f => f && ({ ...f, weight_kg: e.target.value }))}
+                      onBlur={e => saveJobField(selectedJob.id, 'weight_kg', e.target.value ? Number(e.target.value) : null)}
+                      className={inputClass(locked)}
+                    />
+                  </Field>
+                </div>
+
+                <Field label="Dangerous Goods">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      disabled={locked}
+                      checked={jobForm.dangerous_goods}
+                      onChange={e => {
+                        setJobForm(f => f && ({ ...f, dangerous_goods: e.target.checked }));
+                        saveJobField(selectedJob.id, 'dangerous_goods', e.target.checked);
+                      }}
+                      className="rounded cursor-pointer accent-emerald-600"
+                    />
+                    <span className="text-[12px] text-gray-600 dark:text-navy-300">Flagged as dangerous goods</span>
+                  </label>
+                </Field>
+
+                {jobForm.dangerous_goods && (
+                  <Field label="DG Notes">
+                    <textarea
+                      disabled={locked}
+                      value={jobForm.dangerous_goods_notes}
+                      onChange={e => setJobForm(f => f && ({ ...f, dangerous_goods_notes: e.target.value }))}
+                      onBlur={e => saveJobField(selectedJob.id, 'dangerous_goods_notes', e.target.value || null)}
+                      rows={2}
+                      className={inputClass(locked)}
+                    />
+                  </Field>
+                )}
+
+                <div className="pt-2 border-t border-gray-100 dark:border-navy-800">
+                  <p className="text-[11px] font-black text-gray-500 dark:text-navy-400 uppercase tracking-wide mb-3">Additional Details</p>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Client Account">
+                        <input disabled={locked} value={jobForm.client_account}
+                          onChange={e => setJobForm(f => f && ({ ...f, client_account: e.target.value }))}
+                          onBlur={e => saveJobField(selectedJob.id, 'client_account', e.target.value || null)}
+                          className={inputClass(locked)} />
+                      </Field>
+                      <Field label="Package Sequence">
+                        <input disabled={locked} value={jobForm.package_sequence}
+                          onChange={e => setJobForm(f => f && ({ ...f, package_sequence: e.target.value }))}
+                          onBlur={e => saveJobField(selectedJob.id, 'package_sequence', e.target.value || null)}
+                          placeholder="e.g. 1 of 1"
+                          className={inputClass(locked)} />
+                      </Field>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Shipper Contact">
+                        <input disabled={locked} value={jobForm.shipper_contact}
+                          onChange={e => setJobForm(f => f && ({ ...f, shipper_contact: e.target.value }))}
+                          onBlur={e => saveJobField(selectedJob.id, 'shipper_contact', e.target.value || null)}
+                          className={inputClass(locked)} />
+                      </Field>
+                      <Field label="Shipper Phone">
+                        <input disabled={locked} value={jobForm.shipper_phone}
+                          onChange={e => setJobForm(f => f && ({ ...f, shipper_phone: e.target.value }))}
+                          onBlur={e => saveJobField(selectedJob.id, 'shipper_phone', e.target.value || null)}
+                          className={inputClass(locked)} />
+                      </Field>
+                    </div>
+                    <Field label="Shipper Reference">
+                      <input disabled={locked} value={jobForm.shipper_reference}
+                        onChange={e => setJobForm(f => f && ({ ...f, shipper_reference: e.target.value }))}
+                        onBlur={e => saveJobField(selectedJob.id, 'shipper_reference', e.target.value || null)}
+                        className={inputClass(locked)} />
+                    </Field>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Consignee Contact">
+                        <input disabled={locked} value={jobForm.consignee_contact}
+                          onChange={e => setJobForm(f => f && ({ ...f, consignee_contact: e.target.value }))}
+                          onBlur={e => saveJobField(selectedJob.id, 'consignee_contact', e.target.value || null)}
+                          className={inputClass(locked)} />
+                      </Field>
+                      <Field label="Consignee Phone">
+                        <input disabled={locked} value={jobForm.consignee_phone}
+                          onChange={e => setJobForm(f => f && ({ ...f, consignee_phone: e.target.value }))}
+                          onBlur={e => saveJobField(selectedJob.id, 'consignee_phone', e.target.value || null)}
+                          className={inputClass(locked)} />
+                      </Field>
+                    </div>
+                    <Field label="Consignee Reference">
+                      <input disabled={locked} value={jobForm.consignee_reference}
+                        onChange={e => setJobForm(f => f && ({ ...f, consignee_reference: e.target.value }))}
+                        onBlur={e => saveJobField(selectedJob.id, 'consignee_reference', e.target.value || null)}
+                        className={inputClass(locked)} />
+                    </Field>
+
+                    {showCombinedTempDims && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="Temperature Range">
+                          <input disabled={locked} value={jobForm.temperature_range}
+                            onChange={e => setJobForm(f => f && ({ ...f, temperature_range: e.target.value }))}
+                            onBlur={e => saveJobField(selectedJob.id, 'temperature_range', e.target.value || null)}
+                            className={inputClass(locked)} />
+                        </Field>
+                        <Field label="Dimensions (cm)">
+                          <input disabled={locked} value={jobForm.dimensions}
+                            onChange={e => setJobForm(f => f && ({ ...f, dimensions: e.target.value }))}
+                            onBlur={e => saveJobField(selectedJob.id, 'dimensions', e.target.value || null)}
+                            className={inputClass(locked)} />
+                        </Field>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Volumetric Weight (kg)">
+                        <input type="number" step="0.01" disabled={locked} value={jobForm.volumetric_weight_kg}
+                          onChange={e => setJobForm(f => f && ({ ...f, volumetric_weight_kg: e.target.value }))}
+                          onBlur={e => saveJobField(selectedJob.id, 'volumetric_weight_kg', e.target.value ? Number(e.target.value) : null)}
+                          className={inputClass(locked)} />
+                      </Field>
+                      <Field label="Direction">
+                        <select disabled={locked} value={jobForm.direction}
+                          onChange={e => {
+                            setJobForm(f => f && ({ ...f, direction: e.target.value }));
+                            saveJobField(selectedJob.id, 'direction', e.target.value || null);
+                          }}
+                          className={inputClass(locked)}>
+                          <option value="">—</option>
+                          <option value="Inbound">Inbound</option>
+                          <option value="Outbound">Outbound</option>
+                        </select>
+                      </Field>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Declared Value">
+                        <input type="number" step="0.01" disabled={locked} value={jobForm.declared_value}
+                          onChange={e => setJobForm(f => f && ({ ...f, declared_value: e.target.value }))}
+                          onBlur={e => saveJobField(selectedJob.id, 'declared_value', e.target.value ? Number(e.target.value) : null)}
+                          className={inputClass(locked)} />
+                      </Field>
+                      <Field label="Currency">
+                        <input disabled={locked} value={jobForm.declared_value_currency}
+                          onChange={e => setJobForm(f => f && ({ ...f, declared_value_currency: e.target.value.toUpperCase() }))}
+                          onBlur={e => saveJobField(selectedJob.id, 'declared_value_currency', e.target.value || null)}
+                          placeholder="GBP"
+                          className={inputClass(locked)} />
+                      </Field>
+                    </div>
+
+                    <Field label="Special Handling">
+                      <textarea disabled={locked} value={jobForm.special_handling}
+                        onChange={e => setJobForm(f => f && ({ ...f, special_handling: e.target.value }))}
+                        onBlur={e => saveJobField(selectedJob.id, 'special_handling', e.target.value || null)}
+                        rows={4}
+                        className={inputClass(locked)} />
+                    </Field>
+
+                    {selectedJob.packages.length > 0 && (
+                      <Field label={`Packages (${selectedJob.packages.length})`}>
+                        <div className="border border-gray-100 dark:border-navy-700 rounded-xl overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-[11.5px] border-collapse">
+                              <thead>
+                                <tr className="bg-gray-50/80 dark:bg-navy-800/80">
+                                  <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2 w-7">#</th>
+                                  <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Supplier</th>
+                                  <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Type</th>
+                                  <th className="text-right font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Weight</th>
+                                  <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Temp</th>
+                                  <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Dims (cm)</th>
+                                  <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Description</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 dark:divide-navy-800">
+                                {selectedJob.packages.map((p, i) => (
+                                  <tr key={i} className="bg-white dark:bg-navy-900 even:bg-gray-50/40 dark:even:bg-navy-800/30">
+                                    <td className="px-3 py-2 text-gray-400 dark:text-navy-500 font-bold">{i + 1}</td>
+                                    <td className="px-3 py-2 text-gray-700 dark:text-navy-300 whitespace-nowrap">{p.supplier || '—'}</td>
+                                    <td className="px-3 py-2 text-gray-700 dark:text-navy-300 whitespace-nowrap">{p.package_type || '—'}</td>
+                                    <td className="px-3 py-2 text-gray-700 dark:text-navy-300 text-right whitespace-nowrap">{p.weight_kg != null ? `${p.weight_kg} kg` : '—'}</td>
+                                    <td className="px-3 py-2 text-gray-700 dark:text-navy-300 whitespace-nowrap">{p.temperature_range || '—'}</td>
+                                    <td className="px-3 py-2 text-gray-700 dark:text-navy-300 whitespace-nowrap">{p.dimensions || '—'}</td>
+                                    <td className="px-3 py-2 text-gray-700 dark:text-navy-300">{p.content_description || '—'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </Field>
                     )}
                   </div>
-                  <p className="text-[10.5px] text-gray-400 dark:text-navy-500 truncate mt-0.5">{routeLine(job)}</p>
-                </td>
-                <td className="px-4 py-3.5 whitespace-nowrap">
-                  <p className="text-[12px] font-bold text-gray-800 dark:text-gray-100">{job.collection_at ? formatTime(job.collection_at) : '—'}</p>
-                  <p className="text-[10.5px] text-gray-400 dark:text-navy-500">
-                    Collect{job.collection_at ? ` · ${formatDate(job.collection_at)}` : ''}
-                  </p>
-                </td>
-                <td className="px-4 py-3.5 whitespace-nowrap">
-                  <p className="text-[12px] font-bold text-gray-800 dark:text-gray-100">
-                    {job.package_qty ?? '—'} · {job.weight_kg ?? '—'} kg
-                  </p>
-                  <p className="text-[10.5px] text-gray-400 dark:text-navy-500">{job.temperature_range || 'Ambient'}</p>
-                </td>
-                <td className="px-4 py-3.5 whitespace-nowrap">
-                  {job.dangerous_goods_notes ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-2 py-0.5 rounded-full">
-                      <TriangleAlert size={10} /> {job.dangerous_goods_notes}
-                    </span>
-                  ) : (
-                    <span className="text-[11px] text-gray-300 dark:text-navy-600">None</span>
-                  )}
-                </td>
-                <td className="px-4 py-3.5 whitespace-nowrap text-right">
-                  <Tooltip content="Remove from manifest">
-                    <button
-                      onClick={() => handleRemove(job.id)}
-                      className="text-gray-300 dark:text-navy-600 hover:text-red-500 dark:hover:text-red-400"
-                    >
-                      <X size={14} />
-                    </button>
-                  </Tooltip>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                className="h-full flex items-center justify-center text-[12px] text-gray-400 dark:text-navy-500"
+              >
+                Select a job from the run order to view its details.
+              </motion.div>
+            )}
+            </AnimatePresence>
+          </div>
+        </div>
 
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-navy-800">
-          <button
-            onClick={() => setAddModalOpen(true)}
-            disabled={locked}
-            className="flex items-center gap-1 text-[11px] font-bold text-gray-600 dark:text-navy-300 bg-gray-50 dark:bg-navy-800 hover:bg-gray-100 dark:hover:bg-navy-700 disabled:opacity-40 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <Plus size={13} /> Add job
-          </button>
-          <p className="text-[10.5px] text-gray-400 dark:text-navy-500">File-drop stub until courier target is confirmed</p>
-          <button
-            onClick={handleExport}
-            disabled={locked || exporting}
-            className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-navy-900 dark:bg-navy-700 hover:bg-navy-800 dark:hover:bg-navy-600 disabled:opacity-60 px-4 py-2 rounded-lg transition-colors"
-          >
-            <Download size={13} /> {locked ? 'Exported' : exporting ? 'Exporting…' : 'Export manifest'}
-          </button>
+        {/* Run order pane */}
+        <div className="order-1 flex flex-col bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-navy-800">
+            <div>
+              <h2 className="text-[12px] font-bold text-gray-700 dark:text-navy-200">Run order</h2>
+              <p className="text-[10.5px] text-gray-400 dark:text-navy-500">
+                {locked ? 'Manifest is exported and locked' : 'Drag to reorder — click a row to view its details'}
+              </p>
+            </div>
+            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-navy-800 rounded-lg p-0.5 shrink-0">
+              {([1, 2, 3, 4, 5] as const).map(n => (
+                <button
+                  key={n}
+                  onClick={() => setCardDesign(n)}
+                  title={`Design ${n}`}
+                  className={`w-6 h-6 flex items-center justify-center text-[10px] font-bold rounded-md transition-colors ${
+                    cardDesign === n
+                      ? 'bg-white dark:bg-navy-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                      : 'text-gray-400 dark:text-navy-500 hover:text-gray-600 dark:hover:text-navy-300'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className={`flex-1 overflow-y-auto ${cardDesign === 2 ? 'p-3 space-y-2' : 'divide-y divide-gray-50 dark:divide-navy-800/70'}`}>
+            {cardDesign === 3 && (
+              <div className="grid grid-cols-[24px_1fr_56px_56px_44px_50px] gap-2 px-4 py-2 text-[9px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800 sticky top-0 bg-white dark:bg-navy-900">
+                <span>#</span>
+                <span>HAWB · Route</span>
+                <span className="text-right">Coll.</span>
+                <span className="text-right">Del.</span>
+                <span className="text-right">Pkg</span>
+                <span className="text-right">Wt (kg)</span>
+              </div>
+            )}
+            {orderedJobs.map((job, index) => {
+              const selected = selectedJobId === job.id;
+              const pages = pageRangeLabel(job);
+              const dragProps = {
+                draggable: !locked,
+                onDragStart: () => setDragIndex(index),
+                onDragOver: (e: React.DragEvent) => { e.preventDefault(); handleDragOver(index); },
+                onDrop: handleDrop,
+                onClick: () => setSelectedJobId(job.id),
+              };
+
+              /* Design 1 — boarding-pass style route ticket */
+              if (cardDesign === 1) {
+                return (
+                  <div
+                    key={job.id}
+                    {...dragProps}
+                    className={`px-4 py-4 cursor-pointer transition-colors ${
+                      selected ? 'bg-emerald-50/60 dark:bg-emerald-950/20' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2.5">
+                      <span className="text-[10px] font-bold text-gray-400 dark:text-navy-500">
+                        Stop {index + 1} · <span className="font-mono text-gray-600 dark:text-navy-300">{job.hawb_number}</span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {job.client_account && (
+                          <span className="text-[9px] font-bold text-gray-500 dark:text-navy-400 bg-gray-100 dark:bg-navy-800 px-1.5 py-0.5 rounded-full">{job.client_account}</span>
+                        )}
+                        {pages && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-1.5 py-0.5 rounded-full">
+                            <FileText size={9} /> {pages}
+                          </span>
+                        )}
+                        {job.dangerous_goods_notes && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded-full">
+                            <TriangleAlert size={9} /> DG
+                          </span>
+                        )}
+                        <ChevronRight size={14} className={selected ? 'text-emerald-500 shrink-0' : 'text-gray-300 dark:text-navy-600 shrink-0'} />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="text-left w-[92px] shrink-0">
+                        <p className="text-[17px] font-black text-gray-900 dark:text-gray-100 tabular-nums leading-none">
+                          {job.collection_at ? formatTime(job.collection_at) : '—'}
+                        </p>
+                        <p className="text-[9.5px] text-gray-400 dark:text-navy-500 truncate mt-1">{splitAddress(job.shipper).name || '—'}</p>
+                      </div>
+
+                      <div className="flex-1 flex items-center min-w-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-navy-600 shrink-0" />
+                        <span className="flex-1 border-t border-dashed border-gray-300 dark:border-navy-600 mx-1" />
+                        <Truck size={13} className="text-gray-300 dark:text-navy-600 shrink-0" />
+                        <span className="flex-1 border-t border-dashed border-gray-300 dark:border-navy-600 mx-1" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      </div>
+
+                      <div className="text-right w-[92px] shrink-0">
+                        <p className="text-[17px] font-black text-gray-900 dark:text-gray-100 tabular-nums leading-none">
+                          {job.delivery_at ? formatTime(job.delivery_at) : '—'}
+                        </p>
+                        <p className="text-[9.5px] text-gray-400 dark:text-navy-500 truncate mt-1">{splitAddress(job.consignee).name || '—'}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 mt-2.5 text-[9.5px] text-gray-400 dark:text-navy-500">
+                      <span>{job.package_qty ?? '—'} pkg · {job.weight_kg ?? '—'} kg</span>
+                      {job.direction && <span>{job.direction}</span>}
+                      {job.temperature_range && <span>{job.temperature_range}</span>}
+                      {job.declared_value != null && <span>{job.declared_value_currency ?? ''} {job.declared_value}</span>}
+                    </div>
+                  </div>
+                );
+              }
+
+              /* Design 2 — kanban-style ticket card with status stripe */
+              if (cardDesign === 2) {
+                const stripeColor = job.dangerous_goods
+                  ? 'bg-red-500'
+                  : job.direction === 'Outbound'
+                  ? 'bg-blue-500'
+                  : 'bg-emerald-500';
+                return (
+                  <div
+                    key={job.id}
+                    {...dragProps}
+                    className={`relative flex gap-3 pl-4 pr-3 py-3 rounded-xl border cursor-pointer transition-all overflow-hidden ${
+                      selected
+                        ? 'border-emerald-300 dark:border-emerald-700 shadow-md bg-white dark:bg-navy-800'
+                        : 'border-gray-100 dark:border-navy-800 hover:shadow-sm bg-gray-50/50 dark:bg-navy-900/40'
+                    }`}
+                  >
+                    <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${stripeColor}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono font-bold text-[12.5px] text-gray-900 dark:text-gray-100">{job.hawb_number}</span>
+                        <span className="text-[13px] font-black text-gray-900 dark:text-gray-100 shrink-0">
+                          {job.weight_kg ?? '—'} <span className="text-[9px] font-bold text-gray-400 dark:text-navy-500">kg</span>
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-600 dark:text-navy-300 mt-1.5 leading-snug truncate">{splitAddress(job.shipper).name || '—'}</p>
+                      <p className="text-[9px] text-gray-300 dark:text-navy-600 leading-none my-0.5">↓</p>
+                      <p className="text-[11px] text-gray-600 dark:text-navy-300 leading-snug truncate">{splitAddress(job.consignee).name || '—'}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-2.5">
+                        {job.dangerous_goods_notes && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded-full">
+                            <TriangleAlert size={9} /> DG
+                          </span>
+                        )}
+                        {pages && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-1.5 py-0.5 rounded-full">
+                            <FileText size={9} /> {pages}
+                          </span>
+                        )}
+                        {job.client_account && (
+                          <span className="text-[9px] font-bold text-gray-500 dark:text-navy-400 bg-gray-100 dark:bg-navy-800 px-1.5 py-0.5 rounded-full">{job.client_account}</span>
+                        )}
+                        <span className="ml-auto text-[10.5px] font-bold text-gray-700 dark:text-gray-200">
+                          {job.collection_at ? formatTime(job.collection_at) : '—'}
+                        </span>
+                        <ChevronRight size={13} className={selected ? 'text-emerald-500 shrink-0' : 'text-gray-300 dark:text-navy-600 shrink-0'} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              /* Design 3 — dense spreadsheet-style table row */
+              if (cardDesign === 3) {
+                return (
+                  <div
+                    key={job.id}
+                    {...dragProps}
+                    className={`grid grid-cols-[24px_1fr_56px_56px_44px_50px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[11px] border-b border-gray-50 dark:border-navy-800/70 transition-colors ${
+                      selected ? 'bg-emerald-50/70 dark:bg-emerald-950/25' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
+                    }`}
+                  >
+                    <span className="text-gray-400 dark:text-navy-500 font-mono text-[10px]">{index + 1}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{job.hawb_number}</span>
+                        {job.dangerous_goods_notes && <TriangleAlert size={10} className="text-red-500 shrink-0" />}
+                        {pages && <FileText size={10} className="text-blue-500 shrink-0" />}
+                      </div>
+                      <p className="text-gray-400 dark:text-navy-500 truncate text-[10px] mt-0.5">{routeLine(job)}</p>
+                    </div>
+                    <span className="text-gray-600 dark:text-navy-300 text-right tabular-nums">{job.collection_at ? formatTime(job.collection_at) : '—'}</span>
+                    <span className="text-gray-400 dark:text-navy-500 text-right tabular-nums">{job.delivery_at ? formatTime(job.delivery_at) : '—'}</span>
+                    <span className="text-gray-400 dark:text-navy-500 text-right tabular-nums">{job.package_qty ?? '—'}</span>
+                    <span className="text-gray-400 dark:text-navy-500 text-right tabular-nums">{job.weight_kg ?? '—'}</span>
+                  </div>
+                );
+              }
+
+              /* Design 4 — badge row + label/value data grid */
+              if (cardDesign === 4) {
+                return (
+                  <div
+                    key={job.id}
+                    {...dragProps}
+                    className={`flex items-center gap-3 px-4 py-4 cursor-pointer transition-colors border-l-2 ${
+                      selected
+                        ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-500'
+                        : 'border-transparent hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
+                    }`}
+                  >
+                    {!locked && <GripVertical size={14} className="text-gray-300 dark:text-navy-600 cursor-grab shrink-0" />}
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-navy-800 dark:bg-navy-700 text-white text-[11px] font-bold shrink-0">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[12px]">{job.hawb_number}</span>
+                        {job.client_account && (
+                          <span className="text-[9px] font-bold text-gray-500 dark:text-navy-400 bg-gray-100 dark:bg-navy-800 px-1.5 py-0.5 rounded-full">
+                            {job.client_account}
+                          </span>
+                        )}
+                        {pages && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-1.5 py-0.5 rounded-full">
+                            <FileText size={9} /> {pages}
+                          </span>
+                        )}
+                        {job.dangerous_goods_notes && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded-full">
+                            <TriangleAlert size={9} /> {job.dangerous_goods_notes}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10.5px] text-gray-400 dark:text-navy-500 truncate mt-0.5">{routeLine(job)}</p>
+                      <div className="grid grid-cols-4 gap-x-3 gap-y-2 mt-2.5 pt-2.5 border-t border-gray-100 dark:border-navy-800/70">
+                        {[
+                          { label: 'Collection', value: job.collection_at ? formatTime(job.collection_at) : '—' },
+                          { label: 'Delivery', value: job.delivery_at ? formatTime(job.delivery_at) : '—' },
+                          { label: 'Packages', value: job.package_qty ?? '—' },
+                          { label: 'Weight', value: job.weight_kg != null ? `${job.weight_kg} kg` : '—' },
+                          { label: 'Direction', value: job.direction ?? '—' },
+                          { label: 'Handling', value: job.temperature_range ?? '—' },
+                          { label: 'Dimensions', value: job.dimensions ? `${job.dimensions} cm` : '—' },
+                          { label: 'Value', value: job.declared_value != null ? `${job.declared_value_currency ?? ''} ${job.declared_value}` : '—' },
+                        ].map(cell => (
+                          <div key={cell.label} className="min-w-0">
+                            <p className="text-[8.5px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide">{cell.label}</p>
+                            <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 truncate">{cell.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className={selected ? 'text-emerald-500 shrink-0' : 'text-gray-300 dark:text-navy-600 shrink-0'} />
+                  </div>
+                );
+              }
+
+              /* Design 5 — badge row + inline icon-tag meta strip */
+              return (
+                <div
+                  key={job.id}
+                  {...dragProps}
+                  className={`flex items-center gap-3 px-4 py-4 cursor-pointer transition-colors border-l-2 ${
+                    selected
+                      ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-500'
+                      : 'border-transparent hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
+                  }`}
+                >
+                  {!locked && <GripVertical size={14} className="text-gray-300 dark:text-navy-600 cursor-grab shrink-0" />}
+                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-navy-800 dark:bg-navy-700 text-white text-[11px] font-bold shrink-0">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[12px]">{job.hawb_number}</span>
+                      {job.client_account && (
+                        <span className="text-[9px] font-bold text-gray-500 dark:text-navy-400 bg-gray-100 dark:bg-navy-800 px-1.5 py-0.5 rounded-full">
+                          {job.client_account}
+                        </span>
+                      )}
+                      {pages && (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-1.5 py-0.5 rounded-full">
+                          <FileText size={9} /> {pages}
+                        </span>
+                      )}
+                      {job.dangerous_goods_notes && (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded-full">
+                          <TriangleAlert size={9} /> {job.dangerous_goods_notes}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10.5px] text-gray-400 dark:text-navy-500 truncate mt-0.5">{routeLine(job)}</p>
+                    <div className="flex items-center gap-x-3 gap-y-1 flex-wrap mt-1.5 text-[10px] font-medium text-gray-500 dark:text-navy-400">
+                      <span className="flex items-center gap-1">
+                        <Clock size={10} /> {job.collection_at ? formatTime(job.collection_at) : '—'} → {job.delivery_at ? formatTime(job.delivery_at) : '—'}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <PackageIcon size={10} /> {job.package_qty ?? '—'} · {job.weight_kg ?? '—'} kg
+                      </span>
+                      {job.direction && (
+                        <span className="flex items-center gap-1"><ArrowLeftRight size={10} /> {job.direction}</span>
+                      )}
+                      {job.temperature_range && (
+                        <span className="flex items-center gap-1"><Thermometer size={10} /> {job.temperature_range}</span>
+                      )}
+                      {job.dimensions && (
+                        <span className="flex items-center gap-1"><Ruler size={10} /> {job.dimensions} cm</span>
+                      )}
+                      {job.declared_value != null && (
+                        <span className="flex items-center gap-1"><Banknote size={10} /> {job.declared_value_currency ?? ''} {job.declared_value}</span>
+                      )}
+                    </div>
+                  </div>
+                  <ChevronRight size={14} className={selected ? 'text-emerald-500 shrink-0' : 'text-gray-300 dark:text-navy-600 shrink-0'} />
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center justify-end px-4 py-3 border-t border-gray-100 dark:border-navy-800">
+            <button
+              onClick={handleExport}
+              disabled={locked || exporting}
+              className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-navy-900 dark:bg-navy-700 hover:bg-navy-800 dark:hover:bg-navy-600 disabled:opacity-60 px-4 py-2 rounded-lg transition-colors"
+            >
+              <Download size={13} /> {locked ? 'Exported' : exporting ? 'Exporting…' : 'Export manifest'}
+            </button>
+          </div>
         </div>
       </motion.div>
-
-      <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)}>
-        <div className="p-4 border-b border-gray-100 dark:border-navy-800">
-          <h3 className="text-[13px] font-bold text-gray-800 dark:text-gray-100">Add job to manifest</h3>
-          <p className="text-[11px] text-gray-400 dark:text-navy-500 mt-0.5">Pending review and ready-to-manifest jobs</p>
-        </div>
-        <div className="p-2 max-h-80 overflow-y-auto">
-          {addableJobs.length === 0 ? (
-            <p className="text-[12px] text-gray-400 dark:text-navy-500 text-center py-6">No jobs available to add</p>
-          ) : (
-            addableJobs.map(job => (
-              <label
-                key={job.id}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-navy-800/60 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedToAdd.has(job.id)}
-                  onChange={() => toggleAddSelection(job.id)}
-                  className="rounded cursor-pointer accent-emerald-600"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[12px] font-mono font-bold text-emerald-600 dark:text-emerald-400">{job.hawb_number}</p>
-                  <p className="text-[10.5px] text-gray-400 dark:text-navy-500 truncate">{routeLine(job)}</p>
-                </div>
-                <span className={`shrink-0 text-[9.5px] font-bold px-2 py-0.5 rounded-full ${
-                  job.status === 'ready_to_manifest'
-                    ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
-                    : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'
-                }`}>
-                  {job.status === 'ready_to_manifest' ? 'Ready' : 'Pending Review'}
-                </span>
-              </label>
-            ))
-          )}
-        </div>
-        <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-100 dark:border-navy-800">
-          <button
-            onClick={() => setAddModalOpen(false)}
-            className="text-[12px] font-semibold text-gray-500 dark:text-navy-400 hover:text-gray-700 dark:hover:text-navy-200 px-3 py-1.5"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleAddJobs}
-            disabled={selectedToAdd.size === 0 || adding}
-            className="text-[12px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 px-4 py-1.5 rounded-lg transition-colors"
-          >
-            {adding ? 'Adding…' : `Add ${selectedToAdd.size || ''} job${selectedToAdd.size !== 1 ? 's' : ''}`}
-          </button>
-        </div>
-      </Modal>
     </motion.div>
   );
 }
