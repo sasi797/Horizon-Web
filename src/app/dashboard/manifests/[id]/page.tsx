@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Download, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Truck, GripVertical, ArrowLeftRight, Ruler, Banknote } from 'lucide-react';
+import { ChevronRight, ChevronDown, Check, Download, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Truck, GripVertical, ArrowLeftRight, Ruler, Banknote, Building2, MapPin, Phone, Hash } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestQuery,
@@ -14,7 +14,7 @@ import {
   type HawbJob,
 } from '@/services/hawbApi';
 import ApiErrorState from '@/components/ApiErrorState';
-import { splitAddress, cityLine } from '@/lib/hawbFormat';
+import { splitAddress, cityLine, postcodeLine } from '@/lib/hawbFormat';
 
 const MANIFEST_STATUS_BADGE: Record<string, string> = {
   draft: 'bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-navy-300 ring-1 ring-gray-200 dark:ring-navy-700',
@@ -66,10 +66,107 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function Section({
+  icon: Icon, title, children,
+}: {
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center gap-1.5">
+        <Icon size={12} className="text-gray-400 dark:text-navy-500" />
+        <p className="text-[10px] font-black text-gray-500 dark:text-navy-400 uppercase tracking-wide">{title}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function inputClass(locked: boolean) {
   return `w-full text-[13px] border border-gray-200 dark:border-navy-700 rounded-xl px-3 py-2 bg-gray-50/60 dark:bg-navy-800/60 text-gray-700 dark:text-gray-200 focus:outline-none focus:border-emerald-300 dark:focus:border-emerald-600 focus:bg-white dark:focus:bg-navy-800 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/40 transition-all ${
     locked ? 'opacity-60 cursor-not-allowed' : ''
   }`;
+}
+
+function LocationSelect({
+  value, options, placeholder, disabled, onChange,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  placeholder: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [open]);
+
+  const selected = options.find(o => o.value === value);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(o => !o)}
+        className={`${inputClass(disabled)} flex items-center justify-between gap-2 text-left ${open ? 'border-emerald-300 dark:border-emerald-600 ring-2 ring-emerald-100 dark:ring-emerald-900/40' : ''}`}
+      >
+        <span className={`truncate ${selected ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-navy-500'}`}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <ChevronDown size={14} className={`text-gray-400 dark:text-navy-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.12, ease: 'easeOut' }}
+            className="absolute z-20 mt-1.5 w-full max-h-60 overflow-y-auto bg-white dark:bg-navy-800 border border-gray-100 dark:border-navy-700 rounded-xl shadow-lg py-1"
+          >
+            {options.length === 0 && (
+              <p className="px-3 py-2 text-[12px] text-gray-400 dark:text-navy-500">No locations available</p>
+            )}
+            {options.map(o => {
+              const isSelected = o.value === value;
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => { onChange(o.value); setOpen(false); }}
+                  className={`w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-[12.5px] transition-colors ${
+                    isSelected
+                      ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold'
+                      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-navy-700'
+                  }`}
+                >
+                  <span className="truncate">{o.label}</span>
+                  {isSelected && <Check size={13} className="shrink-0" />}
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 type JobForm = {
@@ -80,6 +177,7 @@ type JobForm = {
   consignee_contact: string; consignee_phone: string; consignee_reference: string;
   temperature_range: string; dimensions: string; volumetric_weight_kg: string;
   declared_value: string; declared_value_currency: string; direction: string; special_handling: string;
+  job_service_type: string;
 };
 
 function formFromJob(job: HawbJob): JobForm {
@@ -107,6 +205,7 @@ function formFromJob(job: HawbJob): JobForm {
     declared_value_currency: job.declared_value_currency ?? '',
     direction: job.direction ?? '',
     special_handling: job.special_handling ?? '',
+    job_service_type: job.job_service_type ?? '',
   };
 }
 
@@ -162,6 +261,28 @@ export default function ManifestDetailPage() {
   const dgCount = orderedJobs.filter(j => j.dangerous_goods).length;
   const packageCount = orderedJobs.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
 
+  // Start/end point pickers offer the collection & delivery addresses already present on
+  // this manifest's run, so choosing a start point can auto-fill its matching end point.
+  const startOptions = Array.from(
+    new Map(
+      orderedJobs.filter(j => j.shipper).map(j => [j.shipper as string, {
+        value: j.shipper as string,
+        label: [splitAddress(j.shipper).name, cityLine(j.shipper)].filter(Boolean).join(' · '),
+        pairedEnd: j.consignee ?? '',
+      }]),
+    ).values(),
+  );
+  const endOptions = Array.from(
+    new Map(
+      orderedJobs.filter(j => j.consignee).map(j => [j.consignee as string, {
+        value: j.consignee as string,
+        label: [splitAddress(j.consignee).name, cityLine(j.consignee)].filter(Boolean).join(' · '),
+      }]),
+    ).values(),
+  );
+  const withCurrentValue = (options: { value: string; label: string }[], current: string) =>
+    !current || options.some(o => o.value === current) ? options : [{ value: current, label: current }, ...options];
+
   const persistOrder = async (jobs: HawbJob[]) => {
     try {
       await reorderJobs({ manifestId: manifest.id, job_ids: jobs.map(j => j.id) }).unwrap();
@@ -204,6 +325,26 @@ export default function ManifestDetailPage() {
     }
   };
 
+  const swapShipperConsignee = async () => {
+    if (locked || !selectedJob || !jobForm) return;
+    const swapped = {
+      shipper: jobForm.consignee,
+      consignee: jobForm.shipper,
+      shipper_contact: jobForm.consignee_contact,
+      shipper_phone: jobForm.consignee_phone,
+      shipper_reference: jobForm.consignee_reference,
+      consignee_contact: jobForm.shipper_contact,
+      consignee_phone: jobForm.shipper_phone,
+      consignee_reference: jobForm.shipper_reference,
+    };
+    setJobForm(f => f && ({ ...f, ...swapped }));
+    try {
+      await updateJob({ id: selectedJob.id, body: swapped }).unwrap();
+    } catch {
+      // reverts to server value on next refetch
+    }
+  };
+
   const handleExport = async () => {
     try {
       const blob = await exportManifest(manifest.id).unwrap();
@@ -224,24 +365,33 @@ export default function ManifestDetailPage() {
 
   return (
     <motion.div variants={pageTransition} initial="hidden" animate="visible" className="space-y-4">
-      <motion.div variants={staggerItem} className="flex items-start gap-3">
-        <button onClick={() => router.push('/dashboard/manifests')} className="text-gray-400 dark:text-navy-500 hover:text-gray-600 dark:hover:text-navy-300 mt-0.5">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-base font-black text-gray-900 dark:text-gray-100 leading-tight font-mono">{manifest.reference_number}</h1>
-            <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${MANIFEST_STATUS_BADGE[manifest.status]}`}>
-              {MANIFEST_STATUS_LABEL[manifest.status]}
-            </span>
+      <motion.div variants={staggerItem} className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <button onClick={() => router.push('/dashboard/manifests')} className="text-gray-400 dark:text-navy-500 hover:text-gray-600 dark:hover:text-navy-300 mt-0.5">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 dark:text-gray-100 leading-tight font-mono">{manifest.reference_number}</h1>
+              <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${MANIFEST_STATUS_BADGE[manifest.status]}`}>
+                {MANIFEST_STATUS_LABEL[manifest.status]}
+              </span>
+            </div>
+            <p className="text-[11px] text-gray-400 dark:text-navy-500 mt-0.5">
+              {manifest.document.filename} · Created {formatDate(manifest.created_at)} · operator {initials(manifest.created_by_name)} ·{' '}
+              {manifest.exported_at ? `exported ${formatDate(manifest.exported_at)}` : 'not yet exported'}
+            </p>
           </div>
-          <p className="text-[11px] text-gray-400 dark:text-navy-500 mt-0.5">
-            {manifest.document.filename} · Created {formatDate(manifest.created_at)} · operator {initials(manifest.created_by_name)} ·{' '}
-            {manifest.exported_at ? `exported ${formatDate(manifest.exported_at)}` : 'not yet exported'}
-          </p>
         </div>
+        <button
+          onClick={() => window.open(manifest.pdf_url, '_blank', 'noopener,noreferrer')}
+          title="View full PDF in a new tab"
+          className="flex items-center gap-1.5 text-xs font-bold text-white bg-gray-700 dark:bg-navy-700 hover:bg-gray-800 dark:hover:bg-navy-600 px-3 py-1.5 rounded-full transition-colors shrink-0"
+        >
+          <ExternalLink size={14} /> View PDF
+        </button>
       </motion.div>
 
       <motion.div variants={staggerItem} className="grid grid-cols-4 gap-3">
@@ -261,25 +411,34 @@ export default function ManifestDetailPage() {
       <motion.div variants={staggerItem} className="grid grid-cols-2 gap-3">
         <div className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm px-4 py-3">
           <Field label="Start point">
-            <input
+            <LocationSelect
               disabled={locked}
               value={points.start_point}
-              onChange={e => setPoints(p => ({ ...p, start_point: e.target.value }))}
-              onBlur={e => savePoint('start_point', e.target.value)}
               placeholder="Collection start location"
-              className={inputClass(locked)}
+              options={withCurrentValue(startOptions, points.start_point)}
+              onChange={value => {
+                const match = startOptions.find(o => o.value === value);
+                const nextEnd = match?.pairedEnd || points.end_point;
+                setPoints({ start_point: value, end_point: nextEnd });
+                savePoint('start_point', value);
+                if (match?.pairedEnd && match.pairedEnd !== points.end_point) {
+                  savePoint('end_point', match.pairedEnd);
+                }
+              }}
             />
           </Field>
         </div>
         <div className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm px-4 py-3">
           <Field label="End point">
-            <input
+            <LocationSelect
               disabled={locked}
               value={points.end_point}
-              onChange={e => setPoints(p => ({ ...p, end_point: e.target.value }))}
-              onBlur={e => savePoint('end_point', e.target.value)}
               placeholder="Final delivery location"
-              className={inputClass(locked)}
+              options={withCurrentValue(endOptions, points.end_point)}
+              onChange={value => {
+                setPoints(p => ({ ...p, end_point: value }));
+                savePoint('end_point', value);
+              }}
             />
           </Field>
         </div>
@@ -296,13 +455,6 @@ export default function ManifestDetailPage() {
                   <FileText size={11} /> {selectedJob.hawb_number} · {pageRangeLabel(selectedJob) ?? 'Page 1'}
                 </span>
               )}
-              <button
-                onClick={() => window.open(manifest.pdf_url, '_blank', 'noopener,noreferrer')}
-                title="View full PDF in a new tab"
-                className="flex items-center gap-1 text-[10.5px] font-bold text-gray-500 dark:text-navy-400 bg-gray-50 dark:bg-navy-800 hover:bg-gray-100 dark:hover:bg-navy-700 px-2 py-0.5 rounded-full transition-colors"
-              >
-                <ExternalLink size={11} /> View PDF
-              </button>
             </div>
           </div>
 
@@ -315,78 +467,163 @@ export default function ManifestDetailPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2, ease: 'easeOut' }}
-                className="space-y-4"
+                className="space-y-6"
               >
-                <Field label="Shipper">
-                  <textarea
-                    disabled={locked}
-                    value={jobForm.shipper}
-                    onChange={e => setJobForm(f => f && ({ ...f, shipper: e.target.value }))}
-                    onBlur={e => saveJobField(selectedJob.id, 'shipper', e.target.value || null)}
-                    rows={5}
-                    className={inputClass(locked)}
-                  />
-                </Field>
-
-                <Field label="Consignee">
-                  <textarea
-                    disabled={locked}
-                    value={jobForm.consignee}
-                    onChange={e => setJobForm(f => f && ({ ...f, consignee: e.target.value }))}
-                    onBlur={e => saveJobField(selectedJob.id, 'consignee', e.target.value || null)}
-                    rows={5}
-                    className={inputClass(locked)}
-                  />
-                </Field>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Collection">
-                    <input
-                      type="datetime-local"
+                {/* At-a-glance journey card */}
+                <div className="rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white dark:from-emerald-950/20 dark:to-navy-900 border border-emerald-100 dark:border-emerald-900/40 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-center gap-1 text-[9px] font-bold text-emerald-600/80 dark:text-emerald-400/70 uppercase tracking-wide">
+                        <MapPin size={11} /> From
+                      </p>
+                      <p className="text-[13px] font-black text-gray-900 dark:text-gray-100 truncate mt-0.5">{splitAddress(jobForm.shipper).name || '—'}</p>
+                      <p className="text-[10px] text-gray-500 dark:text-navy-400 truncate">{cityLine(jobForm.shipper) || '—'}</p>
+                      {postcodeLine(jobForm.shipper) && (
+                        <p className="text-[10px] text-gray-400 dark:text-navy-500 truncate">{postcodeLine(jobForm.shipper)}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={swapShipperConsignee}
                       disabled={locked}
-                      value={jobForm.collection_at}
-                      onChange={e => setJobForm(f => f && ({ ...f, collection_at: e.target.value }))}
-                      onBlur={e => saveJobField(selectedJob.id, 'collection_at', e.target.value ? `${e.target.value}:00` : null)}
-                      className={inputClass(locked)}
-                    />
-                  </Field>
-                  <Field label="Delivery">
-                    <input
-                      type="datetime-local"
-                      disabled={locked}
-                      value={jobForm.delivery_at}
-                      onChange={e => setJobForm(f => f && ({ ...f, delivery_at: e.target.value }))}
-                      onBlur={e => saveJobField(selectedJob.id, 'delivery_at', e.target.value ? `${e.target.value}:00` : null)}
-                      className={inputClass(locked)}
-                    />
-                  </Field>
+                      title="Swap shipper and consignee"
+                      className="group w-8 h-8 rounded-full bg-white dark:bg-navy-800 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center shadow-sm shrink-0 transition hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-navy-800"
+                    >
+                      <ArrowLeftRight size={13} className="text-emerald-600 dark:text-emerald-400 transition-transform group-hover:scale-110" />
+                    </button>
+                    <div className="min-w-0 flex-1 text-right">
+                      <p className="flex items-center justify-end gap-1 text-[9px] font-bold text-emerald-600/80 dark:text-emerald-400/70 uppercase tracking-wide">
+                        To <Building2 size={11} />
+                      </p>
+                      <p className="text-[13px] font-black text-gray-900 dark:text-gray-100 truncate mt-0.5">{splitAddress(jobForm.consignee).name || '—'}</p>
+                      <p className="text-[10px] text-gray-500 dark:text-navy-400 truncate">{cityLine(jobForm.consignee) || '—'}</p>
+                      {postcodeLine(jobForm.consignee) && (
+                        <p className="text-[10px] text-gray-400 dark:text-navy-500 truncate">{postcodeLine(jobForm.consignee)}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 mt-3.5 pt-3.5 border-t border-emerald-100/70 dark:border-emerald-900/30">
+                    <div className="flex items-center gap-1.5">
+                      <PackageIcon size={12} className="text-gray-400 dark:text-navy-500" />
+                      <span className="text-[11.5px] font-bold text-gray-700 dark:text-gray-200">
+                        {jobForm.weight_kg || '—'} kg
+                      </span>
+                    </div>
+                    {jobForm.dangerous_goods && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-2.5 py-1 rounded-lg whitespace-nowrap">
+                        <TriangleAlert size={11} /> DG
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Package Qty">
-                    <input
-                      type="number"
-                      disabled={locked}
-                      value={jobForm.package_qty}
-                      onChange={e => setJobForm(f => f && ({ ...f, package_qty: e.target.value }))}
-                      onBlur={e => saveJobField(selectedJob.id, 'package_qty', e.target.value ? Number(e.target.value) : null)}
-                      className={inputClass(locked)}
-                    />
-                  </Field>
-                  <Field label="Weight (kg)">
-                    <input
-                      type="number"
-                      step="0.01"
-                      disabled={locked}
-                      value={jobForm.weight_kg}
-                      onChange={e => setJobForm(f => f && ({ ...f, weight_kg: e.target.value }))}
-                      onBlur={e => saveJobField(selectedJob.id, 'weight_kg', e.target.value ? Number(e.target.value) : null)}
-                      className={inputClass(locked)}
-                    />
-                  </Field>
+                <div className="flex items-center justify-end gap-4">
+                  {[
+                    { value: 'delivery', label: 'Delivery' },
+                    { value: 'collection', label: 'Collection' },
+                    { value: 'collection_and_delivery', label: 'Collection and Delivery' },
+                  ].map(opt => (
+                    <label key={opt.value} className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 dark:text-navy-300 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="job_service_type"
+                        disabled={locked}
+                        checked={jobForm.job_service_type === opt.value}
+                        onChange={() => {
+                          setJobForm(f => f && ({ ...f, job_service_type: opt.value }));
+                          saveJobField(selectedJob.id, 'job_service_type', opt.value);
+                        }}
+                        className="accent-emerald-600"
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
                 </div>
 
-                <Field label="Dangerous Goods">
+                {/* Shipper / Consignee */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Section icon={MapPin} title="Shipper">
+                    <textarea
+                      disabled={locked}
+                      value={jobForm.shipper}
+                      onChange={e => setJobForm(f => f && ({ ...f, shipper: e.target.value }))}
+                      onBlur={e => saveJobField(selectedJob.id, 'shipper', e.target.value || null)}
+                      rows={5}
+                      className={inputClass(locked)}
+                    />
+                  </Section>
+                  <Section icon={Building2} title="Consignee">
+                    <textarea
+                      disabled={locked}
+                      value={jobForm.consignee}
+                      onChange={e => setJobForm(f => f && ({ ...f, consignee: e.target.value }))}
+                      onBlur={e => saveJobField(selectedJob.id, 'consignee', e.target.value || null)}
+                      rows={5}
+                      className={inputClass(locked)}
+                    />
+                  </Section>
+                </div>
+
+                {/* Schedule */}
+                <Section icon={Clock} title="Schedule">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Collection">
+                      <input
+                        type="datetime-local"
+                        disabled={locked}
+                        value={jobForm.collection_at}
+                        onChange={e => setJobForm(f => f && ({ ...f, collection_at: e.target.value }))}
+                        onBlur={e => saveJobField(selectedJob.id, 'collection_at', e.target.value ? `${e.target.value}:00` : null)}
+                        className={inputClass(locked)}
+                      />
+                    </Field>
+                    <Field label="Delivery">
+                      <input
+                        type="datetime-local"
+                        disabled={locked}
+                        value={jobForm.delivery_at}
+                        onChange={e => setJobForm(f => f && ({ ...f, delivery_at: e.target.value }))}
+                        onBlur={e => saveJobField(selectedJob.id, 'delivery_at', e.target.value ? `${e.target.value}:00` : null)}
+                        className={inputClass(locked)}
+                      />
+                    </Field>
+                  </div>
+                </Section>
+
+                {/* Package */}
+                <Section icon={PackageIcon} title="Package">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Package Qty">
+                      <input
+                        type="number"
+                        disabled={locked}
+                        value={jobForm.package_qty}
+                        onChange={e => setJobForm(f => f && ({ ...f, package_qty: e.target.value }))}
+                        onBlur={e => saveJobField(selectedJob.id, 'package_qty', e.target.value ? Number(e.target.value) : null)}
+                        className={inputClass(locked)}
+                      />
+                    </Field>
+                    <Field label="Weight (kg)">
+                      <input
+                        type="number"
+                        step="0.01"
+                        disabled={locked}
+                        value={jobForm.weight_kg}
+                        onChange={e => setJobForm(f => f && ({ ...f, weight_kg: e.target.value }))}
+                        onBlur={e => saveJobField(selectedJob.id, 'weight_kg', e.target.value ? Number(e.target.value) : null)}
+                        className={inputClass(locked)}
+                      />
+                    </Field>
+                  </div>
+                </Section>
+
+                {/* Dangerous goods — alert-styled toggle */}
+                <div className={`rounded-xl border p-3.5 transition-colors ${
+                  jobForm.dangerous_goods
+                    ? 'border-red-200 dark:border-red-900/50 bg-red-50/60 dark:bg-red-950/20'
+                    : 'border-gray-100 dark:border-navy-800 bg-gray-50/40 dark:bg-navy-800/30'
+                }`}>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -396,87 +633,101 @@ export default function ManifestDetailPage() {
                         setJobForm(f => f && ({ ...f, dangerous_goods: e.target.checked }));
                         saveJobField(selectedJob.id, 'dangerous_goods', e.target.checked);
                       }}
-                      className="rounded cursor-pointer accent-emerald-600"
+                      className="rounded cursor-pointer accent-red-600"
                     />
-                    <span className="text-[12px] text-gray-600 dark:text-navy-300">Flagged as dangerous goods</span>
+                    <span className={`flex items-center gap-1.5 text-[12px] font-bold ${
+                      jobForm.dangerous_goods ? 'text-red-700 dark:text-red-400' : 'text-gray-600 dark:text-navy-300'
+                    }`}>
+                      <TriangleAlert size={13} /> Dangerous goods
+                    </span>
                   </label>
-                </Field>
 
-                {jobForm.dangerous_goods && (
-                  <Field label="DG Notes">
+                  {jobForm.dangerous_goods && (
                     <textarea
                       disabled={locked}
                       value={jobForm.dangerous_goods_notes}
                       onChange={e => setJobForm(f => f && ({ ...f, dangerous_goods_notes: e.target.value }))}
                       onBlur={e => saveJobField(selectedJob.id, 'dangerous_goods_notes', e.target.value || null)}
+                      placeholder="UN number, class, notes…"
                       rows={2}
-                      className={inputClass(locked)}
+                      className={`${inputClass(locked)} mt-3`}
                     />
-                  </Field>
-                )}
+                  )}
+                </div>
 
-                <div className="pt-2 border-t border-gray-100 dark:border-navy-800">
-                  <p className="text-[11px] font-black text-gray-500 dark:text-navy-400 uppercase tracking-wide mb-3">Additional Details</p>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Client Account">
-                        <input disabled={locked} value={jobForm.client_account}
-                          onChange={e => setJobForm(f => f && ({ ...f, client_account: e.target.value }))}
-                          onBlur={e => saveJobField(selectedJob.id, 'client_account', e.target.value || null)}
-                          className={inputClass(locked)} />
-                      </Field>
-                      <Field label="Package Sequence">
-                        <input disabled={locked} value={jobForm.package_sequence}
-                          onChange={e => setJobForm(f => f && ({ ...f, package_sequence: e.target.value }))}
-                          onBlur={e => saveJobField(selectedJob.id, 'package_sequence', e.target.value || null)}
-                          placeholder="e.g. 1 of 1"
-                          className={inputClass(locked)} />
-                      </Field>
+                {/* Additional details panel */}
+                <div className="rounded-xl border border-gray-100 dark:border-navy-800 bg-gray-50/40 dark:bg-navy-950/30 p-4 space-y-5">
+                  <p className="text-[10.5px] font-black text-gray-400 dark:text-navy-500 uppercase tracking-wide">Additional details</p>
+
+                  <Section icon={Hash} title="References">
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="Client Account">
+                          <input disabled={locked} value={jobForm.client_account}
+                            onChange={e => setJobForm(f => f && ({ ...f, client_account: e.target.value }))}
+                            onBlur={e => saveJobField(selectedJob.id, 'client_account', e.target.value || null)}
+                            className={inputClass(locked)} />
+                        </Field>
+                        <Field label="Package Sequence">
+                          <input disabled={locked} value={jobForm.package_sequence}
+                            onChange={e => setJobForm(f => f && ({ ...f, package_sequence: e.target.value }))}
+                            onBlur={e => saveJobField(selectedJob.id, 'package_sequence', e.target.value || null)}
+                            placeholder="e.g. 1 of 1"
+                            className={inputClass(locked)} />
+                        </Field>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="Shipper Reference">
+                          <input disabled={locked} value={jobForm.shipper_reference}
+                            onChange={e => setJobForm(f => f && ({ ...f, shipper_reference: e.target.value }))}
+                            onBlur={e => saveJobField(selectedJob.id, 'shipper_reference', e.target.value || null)}
+                            className={inputClass(locked)} />
+                        </Field>
+                        <Field label="Consignee Reference">
+                          <input disabled={locked} value={jobForm.consignee_reference}
+                            onChange={e => setJobForm(f => f && ({ ...f, consignee_reference: e.target.value }))}
+                            onBlur={e => saveJobField(selectedJob.id, 'consignee_reference', e.target.value || null)}
+                            className={inputClass(locked)} />
+                        </Field>
+                      </div>
                     </div>
+                  </Section>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Shipper Contact">
-                        <input disabled={locked} value={jobForm.shipper_contact}
-                          onChange={e => setJobForm(f => f && ({ ...f, shipper_contact: e.target.value }))}
-                          onBlur={e => saveJobField(selectedJob.id, 'shipper_contact', e.target.value || null)}
-                          className={inputClass(locked)} />
-                      </Field>
-                      <Field label="Shipper Phone">
-                        <input disabled={locked} value={jobForm.shipper_phone}
-                          onChange={e => setJobForm(f => f && ({ ...f, shipper_phone: e.target.value }))}
-                          onBlur={e => saveJobField(selectedJob.id, 'shipper_phone', e.target.value || null)}
-                          className={inputClass(locked)} />
-                      </Field>
+                  <Section icon={Phone} title="Contacts">
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="Shipper Contact">
+                          <input disabled={locked} value={jobForm.shipper_contact}
+                            onChange={e => setJobForm(f => f && ({ ...f, shipper_contact: e.target.value }))}
+                            onBlur={e => saveJobField(selectedJob.id, 'shipper_contact', e.target.value || null)}
+                            className={inputClass(locked)} />
+                        </Field>
+                        <Field label="Shipper Phone">
+                          <input disabled={locked} value={jobForm.shipper_phone}
+                            onChange={e => setJobForm(f => f && ({ ...f, shipper_phone: e.target.value }))}
+                            onBlur={e => saveJobField(selectedJob.id, 'shipper_phone', e.target.value || null)}
+                            className={inputClass(locked)} />
+                        </Field>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="Consignee Contact">
+                          <input disabled={locked} value={jobForm.consignee_contact}
+                            onChange={e => setJobForm(f => f && ({ ...f, consignee_contact: e.target.value }))}
+                            onBlur={e => saveJobField(selectedJob.id, 'consignee_contact', e.target.value || null)}
+                            className={inputClass(locked)} />
+                        </Field>
+                        <Field label="Consignee Phone">
+                          <input disabled={locked} value={jobForm.consignee_phone}
+                            onChange={e => setJobForm(f => f && ({ ...f, consignee_phone: e.target.value }))}
+                            onBlur={e => saveJobField(selectedJob.id, 'consignee_phone', e.target.value || null)}
+                            className={inputClass(locked)} />
+                        </Field>
+                      </div>
                     </div>
-                    <Field label="Shipper Reference">
-                      <input disabled={locked} value={jobForm.shipper_reference}
-                        onChange={e => setJobForm(f => f && ({ ...f, shipper_reference: e.target.value }))}
-                        onBlur={e => saveJobField(selectedJob.id, 'shipper_reference', e.target.value || null)}
-                        className={inputClass(locked)} />
-                    </Field>
+                  </Section>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Consignee Contact">
-                        <input disabled={locked} value={jobForm.consignee_contact}
-                          onChange={e => setJobForm(f => f && ({ ...f, consignee_contact: e.target.value }))}
-                          onBlur={e => saveJobField(selectedJob.id, 'consignee_contact', e.target.value || null)}
-                          className={inputClass(locked)} />
-                      </Field>
-                      <Field label="Consignee Phone">
-                        <input disabled={locked} value={jobForm.consignee_phone}
-                          onChange={e => setJobForm(f => f && ({ ...f, consignee_phone: e.target.value }))}
-                          onBlur={e => saveJobField(selectedJob.id, 'consignee_phone', e.target.value || null)}
-                          className={inputClass(locked)} />
-                      </Field>
-                    </div>
-                    <Field label="Consignee Reference">
-                      <input disabled={locked} value={jobForm.consignee_reference}
-                        onChange={e => setJobForm(f => f && ({ ...f, consignee_reference: e.target.value }))}
-                        onBlur={e => saveJobField(selectedJob.id, 'consignee_reference', e.target.value || null)}
-                        className={inputClass(locked)} />
-                    </Field>
-
-                    {showCombinedTempDims && (
+                  {showCombinedTempDims && (
+                    <Section icon={Thermometer} title="Handling">
                       <div className="grid grid-cols-2 gap-3">
                         <Field label="Temperature Range">
                           <input disabled={locked} value={jobForm.temperature_range}
@@ -491,88 +742,91 @@ export default function ManifestDetailPage() {
                             className={inputClass(locked)} />
                         </Field>
                       </div>
-                    )}
+                    </Section>
+                  )}
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Volumetric Weight (kg)">
-                        <input type="number" step="0.01" disabled={locked} value={jobForm.volumetric_weight_kg}
-                          onChange={e => setJobForm(f => f && ({ ...f, volumetric_weight_kg: e.target.value }))}
-                          onBlur={e => saveJobField(selectedJob.id, 'volumetric_weight_kg', e.target.value ? Number(e.target.value) : null)}
-                          className={inputClass(locked)} />
-                      </Field>
-                      <Field label="Direction">
-                        <select disabled={locked} value={jobForm.direction}
-                          onChange={e => {
-                            setJobForm(f => f && ({ ...f, direction: e.target.value }));
-                            saveJobField(selectedJob.id, 'direction', e.target.value || null);
-                          }}
-                          className={inputClass(locked)}>
-                          <option value="">—</option>
-                          <option value="Inbound">Inbound</option>
-                          <option value="Outbound">Outbound</option>
-                        </select>
-                      </Field>
+                  <Section icon={Banknote} title="Commercial">
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="Volumetric Weight (kg)">
+                          <input type="number" step="0.01" disabled={locked} value={jobForm.volumetric_weight_kg}
+                            onChange={e => setJobForm(f => f && ({ ...f, volumetric_weight_kg: e.target.value }))}
+                            onBlur={e => saveJobField(selectedJob.id, 'volumetric_weight_kg', e.target.value ? Number(e.target.value) : null)}
+                            className={inputClass(locked)} />
+                        </Field>
+                        <Field label="Direction">
+                          <select disabled={locked} value={jobForm.direction}
+                            onChange={e => {
+                              setJobForm(f => f && ({ ...f, direction: e.target.value }));
+                              saveJobField(selectedJob.id, 'direction', e.target.value || null);
+                            }}
+                            className={inputClass(locked)}>
+                            <option value="">—</option>
+                            <option value="Inbound">Inbound</option>
+                            <option value="Outbound">Outbound</option>
+                          </select>
+                        </Field>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="Declared Value">
+                          <input type="number" step="0.01" disabled={locked} value={jobForm.declared_value}
+                            onChange={e => setJobForm(f => f && ({ ...f, declared_value: e.target.value }))}
+                            onBlur={e => saveJobField(selectedJob.id, 'declared_value', e.target.value ? Number(e.target.value) : null)}
+                            className={inputClass(locked)} />
+                        </Field>
+                        <Field label="Currency">
+                          <input disabled={locked} value={jobForm.declared_value_currency}
+                            onChange={e => setJobForm(f => f && ({ ...f, declared_value_currency: e.target.value.toUpperCase() }))}
+                            onBlur={e => saveJobField(selectedJob.id, 'declared_value_currency', e.target.value || null)}
+                            placeholder="GBP"
+                            className={inputClass(locked)} />
+                        </Field>
+                      </div>
                     </div>
+                  </Section>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Declared Value">
-                        <input type="number" step="0.01" disabled={locked} value={jobForm.declared_value}
-                          onChange={e => setJobForm(f => f && ({ ...f, declared_value: e.target.value }))}
-                          onBlur={e => saveJobField(selectedJob.id, 'declared_value', e.target.value ? Number(e.target.value) : null)}
-                          className={inputClass(locked)} />
-                      </Field>
-                      <Field label="Currency">
-                        <input disabled={locked} value={jobForm.declared_value_currency}
-                          onChange={e => setJobForm(f => f && ({ ...f, declared_value_currency: e.target.value.toUpperCase() }))}
-                          onBlur={e => saveJobField(selectedJob.id, 'declared_value_currency', e.target.value || null)}
-                          placeholder="GBP"
-                          className={inputClass(locked)} />
-                      </Field>
-                    </div>
+                  <Section icon={FileText} title="Special Handling">
+                    <textarea disabled={locked} value={jobForm.special_handling}
+                      onChange={e => setJobForm(f => f && ({ ...f, special_handling: e.target.value }))}
+                      onBlur={e => saveJobField(selectedJob.id, 'special_handling', e.target.value || null)}
+                      rows={4}
+                      className={inputClass(locked)} />
+                  </Section>
 
-                    <Field label="Special Handling">
-                      <textarea disabled={locked} value={jobForm.special_handling}
-                        onChange={e => setJobForm(f => f && ({ ...f, special_handling: e.target.value }))}
-                        onBlur={e => saveJobField(selectedJob.id, 'special_handling', e.target.value || null)}
-                        rows={4}
-                        className={inputClass(locked)} />
-                    </Field>
-
-                    {selectedJob.packages.length > 0 && (
-                      <Field label={`Packages (${selectedJob.packages.length})`}>
-                        <div className="border border-gray-100 dark:border-navy-700 rounded-xl overflow-hidden">
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-[11.5px] border-collapse">
-                              <thead>
-                                <tr className="bg-gray-50/80 dark:bg-navy-800/80">
-                                  <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2 w-7">#</th>
-                                  <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Supplier</th>
-                                  <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Type</th>
-                                  <th className="text-right font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Weight</th>
-                                  <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Temp</th>
-                                  <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Dims (cm)</th>
-                                  <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Description</th>
+                  {selectedJob.packages.length > 0 && (
+                    <Section icon={PackageIcon} title={`Packages (${selectedJob.packages.length})`}>
+                      <div className="border border-gray-100 dark:border-navy-700 rounded-xl overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-[11.5px] border-collapse">
+                            <thead>
+                              <tr className="bg-gray-50/80 dark:bg-navy-800/80">
+                                <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2 w-7">#</th>
+                                <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Supplier</th>
+                                <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Type</th>
+                                <th className="text-right font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Weight</th>
+                                <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Temp</th>
+                                <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Dims (cm)</th>
+                                <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Description</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-navy-800">
+                              {selectedJob.packages.map((p, i) => (
+                                <tr key={i} className="bg-white dark:bg-navy-900 even:bg-gray-50/40 dark:even:bg-navy-800/30">
+                                  <td className="px-3 py-2 text-gray-400 dark:text-navy-500 font-bold">{i + 1}</td>
+                                  <td className="px-3 py-2 text-gray-700 dark:text-navy-300 whitespace-nowrap">{p.supplier || '—'}</td>
+                                  <td className="px-3 py-2 text-gray-700 dark:text-navy-300 whitespace-nowrap">{p.package_type || '—'}</td>
+                                  <td className="px-3 py-2 text-gray-700 dark:text-navy-300 text-right whitespace-nowrap">{p.weight_kg != null ? `${p.weight_kg} kg` : '—'}</td>
+                                  <td className="px-3 py-2 text-gray-700 dark:text-navy-300 whitespace-nowrap">{p.temperature_range || '—'}</td>
+                                  <td className="px-3 py-2 text-gray-700 dark:text-navy-300 whitespace-nowrap">{p.dimensions || '—'}</td>
+                                  <td className="px-3 py-2 text-gray-700 dark:text-navy-300">{p.content_description || '—'}</td>
                                 </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-100 dark:divide-navy-800">
-                                {selectedJob.packages.map((p, i) => (
-                                  <tr key={i} className="bg-white dark:bg-navy-900 even:bg-gray-50/40 dark:even:bg-navy-800/30">
-                                    <td className="px-3 py-2 text-gray-400 dark:text-navy-500 font-bold">{i + 1}</td>
-                                    <td className="px-3 py-2 text-gray-700 dark:text-navy-300 whitespace-nowrap">{p.supplier || '—'}</td>
-                                    <td className="px-3 py-2 text-gray-700 dark:text-navy-300 whitespace-nowrap">{p.package_type || '—'}</td>
-                                    <td className="px-3 py-2 text-gray-700 dark:text-navy-300 text-right whitespace-nowrap">{p.weight_kg != null ? `${p.weight_kg} kg` : '—'}</td>
-                                    <td className="px-3 py-2 text-gray-700 dark:text-navy-300 whitespace-nowrap">{p.temperature_range || '—'}</td>
-                                    <td className="px-3 py-2 text-gray-700 dark:text-navy-300 whitespace-nowrap">{p.dimensions || '—'}</td>
-                                    <td className="px-3 py-2 text-gray-700 dark:text-navy-300">{p.content_description || '—'}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
-                      </Field>
-                    )}
-                  </div>
+                      </div>
+                    </Section>
+                  )}
                 </div>
               </motion.div>
             ) : (

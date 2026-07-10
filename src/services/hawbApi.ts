@@ -37,6 +37,7 @@ export interface HawbJob {
   declared_value_currency: string | null;
   direction: string | null;
   special_handling: string | null;
+  job_service_type: 'delivery' | 'collection' | 'collection_and_delivery' | null;
   packages: HawbPackageLine[];
   extracted_data: Record<string, unknown>;
   status: 'pending_review' | 'ready_to_manifest' | 'manifested';
@@ -84,6 +85,7 @@ export interface HawbJobUpdate {
   declared_value_currency?: string | null;
   direction?: string | null;
   special_handling?: string | null;
+  job_service_type?: 'delivery' | 'collection' | 'collection_and_delivery' | null;
 }
 
 export interface HawbManifest {
