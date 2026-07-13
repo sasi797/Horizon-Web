@@ -19,6 +19,15 @@ const STATUS_LABEL: Record<string, string> = {
   exported: 'Exported',
 };
 
+function BlindBadge({ sourceKind, className = '' }: { sourceKind: HawbManifest['source_kind']; className?: string }) {
+  if (sourceKind !== 'blind') return null;
+  return (
+    <span className={`inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/60 ${className}`}>
+      Blind
+    </span>
+  );
+}
+
 function formatDate(value: string): string {
   return new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -123,8 +132,11 @@ export default function ManifestsPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center text-[9.5px] font-bold px-2 py-0.5 rounded-full ${STATUS_BADGE[m.status]}`}>
-                        {STATUS_LABEL[m.status]}
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className={`inline-flex items-center text-[9.5px] font-bold px-2 py-0.5 rounded-full ${STATUS_BADGE[m.status]}`}>
+                          {STATUS_LABEL[m.status]}
+                        </span>
+                        <BlindBadge sourceKind={m.source_kind} />
                       </span>
                     </td>
                     <td className="px-4 py-4 text-[12px] font-semibold text-gray-800 dark:text-navy-200">{m.job_count}</td>
@@ -163,8 +175,11 @@ export default function ManifestsPage() {
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[13px]">{m.reference_number}</span>
-                <span className={`inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${STATUS_BADGE[m.status]}`}>
-                  {STATUS_LABEL[m.status]}
+                <span className="inline-flex items-center gap-1.5 shrink-0">
+                  <BlindBadge sourceKind={m.source_kind} />
+                  <span className={`inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-full ${STATUS_BADGE[m.status]}`}>
+                    {STATUS_LABEL[m.status]}
+                  </span>
                 </span>
               </div>
 
@@ -219,6 +234,7 @@ export default function ManifestsPage() {
                   <span className={`inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${STATUS_BADGE[m.status]}`}>
                     {STATUS_LABEL[m.status]}
                   </span>
+                  <BlindBadge sourceKind={m.source_kind} />
                 </div>
                 <div className="flex items-center gap-1 mt-1 min-w-0">
                   <MapPin size={10} className="text-gray-300 dark:text-navy-600 shrink-0" />

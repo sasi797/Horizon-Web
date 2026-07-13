@@ -378,6 +378,11 @@ export default function ManifestDetailPage() {
               <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${MANIFEST_STATUS_BADGE[manifest.status]}`}>
                 {MANIFEST_STATUS_LABEL[manifest.status]}
               </span>
+              {manifest.source_kind === 'blind' && (
+                <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/60">
+                  Blind HAWB
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-gray-400 dark:text-navy-500 mt-0.5">
               {manifest.document.filename} · Created {formatDate(manifest.created_at)} · operator {initials(manifest.created_by_name)} ·{' '}
@@ -455,6 +460,15 @@ export default function ManifestDetailPage() {
                   <FileText size={11} /> {selectedJob.hawb_number} · {pageRangeLabel(selectedJob) ?? 'Page 1'}
                 </span>
               )}
+              {selectedJob?.blind_pdf_url && (
+                <button
+                  onClick={() => window.open(selectedJob.blind_pdf_url!, '_blank', 'noopener,noreferrer')}
+                  title="View the companion booking-form PDF used to fill in redacted fields"
+                  className="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-full hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors"
+                >
+                  <ExternalLink size={11} /> Booking Form PDF
+                </button>
+              )}
             </div>
           </div>
 
@@ -469,6 +483,17 @@ export default function ManifestDetailPage() {
                 transition={{ duration: 0.2, ease: 'easeOut' }}
                 className="space-y-6"
               >
+                {selectedJob.source_kind === 'blind' && manifest.document.email_body_text && (
+                  <details className="rounded-2xl bg-amber-50/60 dark:bg-amber-950/10 border border-amber-100 dark:border-amber-900/40 px-4 py-3">
+                    <summary className="text-[10.5px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wide cursor-pointer select-none">
+                      Blind HAWB — source email body (cross-check merged fields)
+                    </summary>
+                    <pre className="mt-2.5 text-[11.5px] text-gray-700 dark:text-navy-300 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
+                      {manifest.document.email_body_text}
+                    </pre>
+                  </details>
+                )}
+
                 {/* At-a-glance journey card */}
                 <div className="rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white dark:from-emerald-950/20 dark:to-navy-900 border border-emerald-100 dark:border-emerald-900/40 p-4">
                   <div className="flex items-center gap-3">

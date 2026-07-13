@@ -40,6 +40,9 @@ export interface HawbJob {
   job_service_type: 'delivery' | 'collection' | 'collection_and_delivery' | null;
   packages: HawbPackageLine[];
   extracted_data: Record<string, unknown>;
+  source_kind: 'plain' | 'blind';
+  blind_document_id: string | null;
+  blind_pdf_url?: string | null;
   status: 'pending_review' | 'ready_to_manifest' | 'manifested';
   manifest_id: string | null;
   manifest_sequence: number | null;
@@ -59,6 +62,8 @@ export interface HawbDocument {
   job_count: number;
   status: string;
   error_message: string | null;
+  source_kind: 'plain' | 'blind';
+  email_body_text: string | null;
 }
 
 export interface HawbJobUpdate {
@@ -99,6 +104,7 @@ export interface HawbManifest {
   end_point: string | null;
   created_by: string | null;
   created_by_name: string | null;
+  source_kind: 'plain' | 'blind';
   created_at: string;
 }
 
