@@ -98,7 +98,7 @@ export interface HawbManifest {
   reference_number: string;
   job_count: number;
   total_weight_kg: number;
-  status: 'draft' | 'exported';
+  status: 'open' | 'booked' | 'confirmed' | 'on_hold' | 'exported';
   exported_at: string | null;
   start_point: string | null;
   end_point: string | null;
@@ -125,8 +125,15 @@ export const hawbApi = api.injectEndpoints({
       query: ({ id, body }) => ({ url: `/hawb/jobs/${id}`, method: 'PATCH', body }),
       invalidatesTags: (_r, _e, { id }) => [{ type: 'HawbJob', id }, 'HawbJob'],
     }),
-    getHawbManifests: build.query<HawbManifest[], void>({
-      query: () => '/hawb/manifests',
+    approveHawbJob: build.mutation<HawbJob, string>({
+      query: (id) => ({ url: `/hawb/jobs/${id}/approve`, method: 'POST' }),
+      invalidatesTags: (_r, _e, id) => [{ type: 'HawbJob', id }, 'HawbJob', 'HawbManifest'],
+    }),
+    getHawbManifests: build.query<HawbManifest[], { needsReview?: boolean } | void>({
+      query: (args) => ({
+        url: '/hawb/manifests',
+        params: args?.needsReview ? { needs_review: true } : undefined,
+      }),
       providesTags: ['HawbManifest'],
     }),
     getHawbManifest: build.query<HawbManifestDetail, string>({
@@ -149,15 +156,31 @@ export const hawbApi = api.injectEndpoints({
       }),
       invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }],
     }),
+    confirmManifest: build.mutation<HawbManifest, string>({
+      query: (manifestId) => ({ url: `/hawb/manifests/${manifestId}/confirm`, method: 'POST' }),
+      invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest'],
+    }),
+    holdManifest: build.mutation<HawbManifest, string>({
+      query: (manifestId) => ({ url: `/hawb/manifests/${manifestId}/hold`, method: 'POST' }),
+      invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest'],
+    }),
+    markManifestExported: build.mutation<HawbManifest, string>({
+      query: (manifestId) => ({ url: `/hawb/manifests/${manifestId}/mark-exported`, method: 'POST' }),
+      invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest'],
+    }),
   }),
   overrideExisting: false,
 });
 
 export const {
   useUpdateHawbJobMutation,
+  useApproveHawbJobMutation,
   useGetHawbManifestsQuery,
   useGetHawbManifestQuery,
   useUpdateHawbManifestMutation,
   useReorderManifestJobsMutation,
   useExportManifestMutation,
+  useConfirmManifestMutation,
+  useHoldManifestMutation,
+  useMarkManifestExportedMutation,
 } = hawbApi;

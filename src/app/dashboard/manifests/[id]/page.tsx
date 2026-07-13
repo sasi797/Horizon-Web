@@ -9,21 +9,43 @@ import {
   useGetHawbManifestQuery,
   useUpdateHawbManifestMutation,
   useUpdateHawbJobMutation,
+  useApproveHawbJobMutation,
   useReorderManifestJobsMutation,
   useExportManifestMutation,
+  useConfirmManifestMutation,
+  useHoldManifestMutation,
+  useMarkManifestExportedMutation,
   type HawbJob,
 } from '@/services/hawbApi';
 import ApiErrorState from '@/components/ApiErrorState';
 import { splitAddress, cityLine, postcodeLine } from '@/lib/hawbFormat';
 
 const MANIFEST_STATUS_BADGE: Record<string, string> = {
-  draft: 'bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-navy-300 ring-1 ring-gray-200 dark:ring-navy-700',
+  open: 'bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-navy-300 ring-1 ring-gray-200 dark:ring-navy-700',
+  booked: 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-800/60',
+  confirmed: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800/60',
+  on_hold: 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800/60',
   exported: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800/60',
 };
 
 const MANIFEST_STATUS_LABEL: Record<string, string> = {
-  draft: 'Draft',
+  open: 'Open',
+  booked: 'Booked',
+  confirmed: 'Confirmed',
+  on_hold: 'On Hold',
   exported: 'Exported',
+};
+
+const JOB_STATUS_BADGE: Record<string, string> = {
+  pending_review: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/60',
+  ready_to_manifest: 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-800/60',
+  manifested: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800/60',
+};
+
+const JOB_STATUS_LABEL: Record<string, string> = {
+  pending_review: 'Pending Review',
+  ready_to_manifest: 'Ready to Manifest',
+  manifested: 'Manifested',
 };
 
 function formatDate(value: string): string {
@@ -216,8 +238,13 @@ export default function ManifestDetailPage() {
   const { data: manifest, isLoading, isError, refetch } = useGetHawbManifestQuery(id);
   const [updateManifest] = useUpdateHawbManifestMutation();
   const [updateJob] = useUpdateHawbJobMutation();
+  const [approveJob, { isLoading: approving }] = useApproveHawbJobMutation();
   const [reorderJobs] = useReorderManifestJobsMutation();
   const [exportManifest, { isLoading: exporting }] = useExportManifestMutation();
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [confirmManifest, { isLoading: confirming }] = useConfirmManifestMutation();
+  const [holdManifest, { isLoading: holding }] = useHoldManifestMutation();
+  const [markExported, { isLoading: markingExported }] = useMarkManifestExportedMutation();
 
   const [orderedJobs, setOrderedJobs] = useState<HawbJob[]>([]);
   const [syncedJobs, setSyncedJobs] = useState<HawbJob[] | undefined>(undefined);
@@ -257,7 +284,7 @@ export default function ManifestDetailPage() {
     return <ApiErrorState title="Failed to load manifest" onRetry={refetch} />;
   }
 
-  const locked = manifest.status === 'exported';
+  const locked = manifest.status !== 'open';
   const dgCount = orderedJobs.filter(j => j.dangerous_goods).length;
   const packageCount = orderedJobs.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
 
@@ -346,6 +373,7 @@ export default function ManifestDetailPage() {
   };
 
   const handleExport = async () => {
+    setExportError(null);
     try {
       const blob = await exportManifest(manifest.id).unwrap();
       const url = URL.createObjectURL(blob);
@@ -354,6 +382,39 @@ export default function ManifestDetailPage() {
       a.download = `${manifest.reference_number}.csv`;
       a.click();
       URL.revokeObjectURL(url);
+    } catch (err) {
+      const detail = (err as { data?: { detail?: string } })?.data?.detail;
+      setExportError(detail || 'Export failed');
+    }
+  };
+
+  const handleApprove = async (jobId: string) => {
+    try {
+      await approveJob(jobId).unwrap();
+    } catch {
+      // no-op — status simply won't change, visible on retry
+    }
+  };
+
+  const handleConfirm = async () => {
+    try {
+      await confirmManifest(manifest.id).unwrap();
+    } catch {
+      // no-op
+    }
+  };
+
+  const handleHold = async () => {
+    try {
+      await holdManifest(manifest.id).unwrap();
+    } catch {
+      // no-op
+    }
+  };
+
+  const handleMarkExported = async () => {
+    try {
+      await markExported(manifest.id).unwrap();
     } catch {
       // no-op
     }
@@ -390,13 +451,30 @@ export default function ManifestDetailPage() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => window.open(manifest.pdf_url, '_blank', 'noopener,noreferrer')}
-          title="View full PDF in a new tab"
-          className="flex items-center gap-1.5 text-xs font-bold text-white bg-gray-700 dark:bg-navy-700 hover:bg-gray-800 dark:hover:bg-navy-600 px-3 py-1.5 rounded-full transition-colors shrink-0"
-        >
-          <ExternalLink size={14} /> View PDF
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {selectedJob && (
+            <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${JOB_STATUS_BADGE[selectedJob.status]}`}>
+              {JOB_STATUS_LABEL[selectedJob.status]}
+            </span>
+          )}
+          {selectedJob && selectedJob.status === 'pending_review' && !locked && (
+            <button
+              onClick={() => handleApprove(selectedJob.id)}
+              disabled={approving}
+              title="Confirm the merged fields are correct and mark this job ready to manifest"
+              className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 px-2.5 py-0.5 rounded-full transition-colors"
+            >
+              <Check size={11} /> {approving ? 'Approving…' : 'Approve'}
+            </button>
+          )}
+          <button
+            onClick={() => window.open(manifest.pdf_url, '_blank', 'noopener,noreferrer')}
+            title="View full PDF in a new tab"
+            className="flex items-center gap-1.5 text-xs font-bold text-white bg-gray-700 dark:bg-navy-700 hover:bg-gray-800 dark:hover:bg-navy-600 px-3 py-1.5 rounded-full transition-colors shrink-0"
+          >
+            <ExternalLink size={14} /> View PDF
+          </button>
+        </div>
       </motion.div>
 
       <motion.div variants={staggerItem} className="grid grid-cols-4 gap-3">
@@ -1185,14 +1263,55 @@ export default function ManifestDetailPage() {
             })}
           </div>
 
-          <div className="flex items-center justify-end px-4 py-3 border-t border-gray-100 dark:border-navy-800">
-            <button
-              onClick={handleExport}
-              disabled={locked || exporting}
-              className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-navy-900 dark:bg-navy-700 hover:bg-navy-800 dark:hover:bg-navy-600 disabled:opacity-60 px-4 py-2 rounded-lg transition-colors"
-            >
-              <Download size={13} /> {locked ? 'Exported' : exporting ? 'Exporting…' : 'Export manifest'}
-            </button>
+          <div className="flex items-center justify-end gap-3 px-4 py-3 border-t border-gray-100 dark:border-navy-800">
+            {exportError && (
+              <span className="text-[11px] font-semibold text-red-600 dark:text-red-400">{exportError}</span>
+            )}
+
+            {manifest.status === 'open' && (
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-navy-900 dark:bg-navy-700 hover:bg-navy-800 dark:hover:bg-navy-600 disabled:opacity-60 px-4 py-2 rounded-lg transition-colors"
+              >
+                <Download size={13} /> {exporting ? 'Exporting…' : 'Export manifest'}
+              </button>
+            )}
+
+            {(manifest.status === 'booked' || manifest.status === 'on_hold') && (
+              <>
+                <button
+                  onClick={handleHold}
+                  disabled={holding || manifest.status === 'on_hold'}
+                  className="flex items-center gap-1.5 text-[12px] font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/50 disabled:opacity-60 px-4 py-2 rounded-lg transition-colors"
+                >
+                  {manifest.status === 'on_hold' ? 'On Hold' : holding ? 'Holding…' : 'Put on Hold'}
+                </button>
+                <button
+                  onClick={handleConfirm}
+                  disabled={confirming}
+                  className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 px-4 py-2 rounded-lg transition-colors"
+                >
+                  <Check size={13} /> {confirming ? 'Confirming…' : 'Confirm'}
+                </button>
+              </>
+            )}
+
+            {manifest.status === 'confirmed' && (
+              <button
+                onClick={handleMarkExported}
+                disabled={markingExported}
+                className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-navy-900 dark:bg-navy-700 hover:bg-navy-800 dark:hover:bg-navy-600 disabled:opacity-60 px-4 py-2 rounded-lg transition-colors"
+              >
+                <Download size={13} /> {markingExported ? 'Marking…' : 'Mark Exported'}
+              </button>
+            )}
+
+            {manifest.status === 'exported' && (
+              <span className="flex items-center gap-1.5 text-[12px] font-bold text-emerald-700 dark:text-emerald-400 px-4 py-2">
+                <Download size={13} /> Exported
+              </span>
+            )}
           </div>
         </div>
       </motion.div>

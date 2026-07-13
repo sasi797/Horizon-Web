@@ -10,12 +10,18 @@ import { useManifestsLiveRefresh } from '@/hooks/useManifestsLiveRefresh';
 import ApiErrorState from '@/components/ApiErrorState';
 
 const STATUS_BADGE: Record<string, string> = {
-  draft: 'bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-navy-300 ring-1 ring-gray-200 dark:ring-navy-700',
+  open: 'bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-navy-300 ring-1 ring-gray-200 dark:ring-navy-700',
+  booked: 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-800/60',
+  confirmed: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800/60',
+  on_hold: 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800/60',
   exported: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800/60',
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  draft: 'Draft',
+  open: 'Open',
+  booked: 'Booked',
+  confirmed: 'Confirmed',
+  on_hold: 'On Hold',
   exported: 'Exported',
 };
 
@@ -57,7 +63,10 @@ function LocationTooltip({ value, className, children }: { value: string | null;
 }
 
 export default function ManifestsPage() {
-  const { data: manifests = [], isLoading, isError, refetch } = useGetHawbManifestsQuery();
+  const [tab, setTab] = useState<'manifests' | 'pending'>('manifests');
+  const { data: manifests = [], isLoading, isError, refetch } = useGetHawbManifestsQuery(
+    tab === 'pending' ? { needsReview: true } : undefined
+  );
   const [layout, setLayout] = useState<1 | 2 | 3>(1);
   useManifestsLiveRefresh();
 
@@ -86,6 +95,25 @@ export default function ManifestsPage() {
         </div>
       </motion.div>
 
+      <motion.div variants={staggerItem} className="flex items-center gap-1 border-b border-gray-100 dark:border-navy-800">
+        {([
+          { key: 'manifests' as const, label: 'Manifests' },
+          { key: 'pending' as const, label: 'Pending Review' },
+        ]).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-3 py-2 text-[12px] font-bold border-b-2 -mb-px transition-colors ${
+              tab === t.key
+                ? 'border-emerald-500 text-gray-900 dark:text-gray-100'
+                : 'border-transparent text-gray-400 dark:text-navy-500 hover:text-gray-600 dark:hover:text-navy-300'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </motion.div>
+
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -96,7 +124,7 @@ export default function ManifestsPage() {
         <ApiErrorState title="Failed to load manifests" onRetry={refetch} />
       ) : manifests.length === 0 ? (
         <div className="flex items-center justify-center h-48 text-gray-300 dark:text-navy-600 text-sm bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800">
-          No manifests yet
+          {tab === 'pending' ? 'Nothing pending review' : 'No manifests yet'}
         </div>
       ) : layout === 1 ? (
         /* Layout 1 — enhanced data table */
