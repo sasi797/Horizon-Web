@@ -9,7 +9,6 @@ import {
   useGetHawbManifestQuery,
   useUpdateHawbManifestMutation,
   useUpdateHawbJobMutation,
-  useApproveHawbJobMutation,
   useReorderManifestJobsMutation,
   useExportManifestMutation,
   useConfirmManifestMutation,
@@ -21,6 +20,7 @@ import ApiErrorState from '@/components/ApiErrorState';
 import { splitAddress, cityLine, postcodeLine } from '@/lib/hawbFormat';
 
 const MANIFEST_STATUS_BADGE: Record<string, string> = {
+  pending_review: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/60',
   open: 'bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-navy-300 ring-1 ring-gray-200 dark:ring-navy-700',
   booked: 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-800/60',
   confirmed: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800/60',
@@ -29,23 +29,12 @@ const MANIFEST_STATUS_BADGE: Record<string, string> = {
 };
 
 const MANIFEST_STATUS_LABEL: Record<string, string> = {
+  pending_review: 'Pending Review',
   open: 'Open',
   booked: 'Booked',
   confirmed: 'Confirmed',
   on_hold: 'On Hold',
   exported: 'Exported',
-};
-
-const JOB_STATUS_BADGE: Record<string, string> = {
-  pending_review: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/60',
-  ready_to_manifest: 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-800/60',
-  manifested: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800/60',
-};
-
-const JOB_STATUS_LABEL: Record<string, string> = {
-  pending_review: 'Pending Review',
-  ready_to_manifest: 'Ready to Manifest',
-  manifested: 'Manifested',
 };
 
 function formatDate(value: string): string {
@@ -238,7 +227,6 @@ export default function ManifestDetailPage() {
   const { data: manifest, isLoading, isError, refetch } = useGetHawbManifestQuery(id);
   const [updateManifest] = useUpdateHawbManifestMutation();
   const [updateJob] = useUpdateHawbJobMutation();
-  const [approveJob, { isLoading: approving }] = useApproveHawbJobMutation();
   const [reorderJobs] = useReorderManifestJobsMutation();
   const [exportManifest, { isLoading: exporting }] = useExportManifestMutation();
   const [exportError, setExportError] = useState<string | null>(null);
@@ -284,7 +272,7 @@ export default function ManifestDetailPage() {
     return <ApiErrorState title="Failed to load manifest" onRetry={refetch} />;
   }
 
-  const locked = manifest.status !== 'open';
+  const locked = manifest.status !== 'open' && manifest.status !== 'pending_review';
   const dgCount = orderedJobs.filter(j => j.dangerous_goods).length;
   const packageCount = orderedJobs.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
 
@@ -388,14 +376,6 @@ export default function ManifestDetailPage() {
     }
   };
 
-  const handleApprove = async (jobId: string) => {
-    try {
-      await approveJob(jobId).unwrap();
-    } catch {
-      // no-op — status simply won't change, visible on retry
-    }
-  };
-
   const handleConfirm = async () => {
     try {
       await confirmManifest(manifest.id).unwrap();
@@ -452,21 +432,6 @@ export default function ManifestDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {selectedJob && (
-            <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${JOB_STATUS_BADGE[selectedJob.status]}`}>
-              {JOB_STATUS_LABEL[selectedJob.status]}
-            </span>
-          )}
-          {selectedJob && selectedJob.status === 'pending_review' && !locked && (
-            <button
-              onClick={() => handleApprove(selectedJob.id)}
-              disabled={approving}
-              title="Confirm the merged fields are correct and mark this job ready to manifest"
-              className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 px-2.5 py-0.5 rounded-full transition-colors"
-            >
-              <Check size={11} /> {approving ? 'Approving…' : 'Approve'}
-            </button>
-          )}
           <button
             onClick={() => window.open(manifest.pdf_url, '_blank', 'noopener,noreferrer')}
             title="View full PDF in a new tab"
@@ -541,10 +506,10 @@ export default function ManifestDetailPage() {
               {selectedJob?.blind_pdf_url && (
                 <button
                   onClick={() => window.open(selectedJob.blind_pdf_url!, '_blank', 'noopener,noreferrer')}
-                  title="View the companion booking-form PDF used to fill in redacted fields"
+                  title="View the companion MF-PCS PDF used to fill in redacted fields"
                   className="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-full hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors"
                 >
-                  <ExternalLink size={11} /> Booking Form PDF
+                  <ExternalLink size={11} /> MF-PCS View PDF
                 </button>
               )}
             </div>

@@ -98,7 +98,7 @@ export interface HawbManifest {
   reference_number: string;
   job_count: number;
   total_weight_kg: number;
-  status: 'open' | 'booked' | 'confirmed' | 'on_hold' | 'exported';
+  status: 'pending_review' | 'open' | 'booked' | 'confirmed' | 'on_hold' | 'exported';
   exported_at: string | null;
   start_point: string | null;
   end_point: string | null;
@@ -119,6 +119,18 @@ export interface HawbManifestDetail extends HawbManifest {
   pdf_url: string;
 }
 
+export interface HawbJobPendingUpdate {
+  id: string;
+  job_id: string;
+  reason: 'duplicate_resend' | 'blind_companion_merge';
+  proposed_data: Record<string, unknown>;
+  status: 'pending' | 'applied' | 'dismissed';
+  created_at: string;
+  resolved_at: string | null;
+  job: HawbJob;
+  source_document: HawbDocument;
+}
+
 export const hawbApi = api.injectEndpoints({
   endpoints: (build) => ({
     updateHawbJob: build.mutation<HawbJob, { id: string; body: HawbJobUpdate }>({
@@ -129,11 +141,8 @@ export const hawbApi = api.injectEndpoints({
       query: (id) => ({ url: `/hawb/jobs/${id}/approve`, method: 'POST' }),
       invalidatesTags: (_r, _e, id) => [{ type: 'HawbJob', id }, 'HawbJob', 'HawbManifest'],
     }),
-    getHawbManifests: build.query<HawbManifest[], { needsReview?: boolean } | void>({
-      query: (args) => ({
-        url: '/hawb/manifests',
-        params: args?.needsReview ? { needs_review: true } : undefined,
-      }),
+    getHawbManifests: build.query<HawbManifest[], void>({
+      query: () => '/hawb/manifests',
       providesTags: ['HawbManifest'],
     }),
     getHawbManifest: build.query<HawbManifestDetail, string>({
@@ -168,6 +177,18 @@ export const hawbApi = api.injectEndpoints({
       query: (manifestId) => ({ url: `/hawb/manifests/${manifestId}/mark-exported`, method: 'POST' }),
       invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest'],
     }),
+    getJobUpdates: build.query<HawbJobPendingUpdate[], void>({
+      query: () => '/hawb/job-updates',
+      providesTags: ['HawbJobPendingUpdate'],
+    }),
+    applyJobUpdate: build.mutation<HawbJob, string>({
+      query: (id) => ({ url: `/hawb/job-updates/${id}/apply`, method: 'POST' }),
+      invalidatesTags: ['HawbJobPendingUpdate', 'HawbJob', 'HawbManifest'],
+    }),
+    dismissJobUpdate: build.mutation<HawbJobPendingUpdate, string>({
+      query: (id) => ({ url: `/hawb/job-updates/${id}/dismiss`, method: 'POST' }),
+      invalidatesTags: ['HawbJobPendingUpdate'],
+    }),
   }),
   overrideExisting: false,
 });
@@ -183,4 +204,7 @@ export const {
   useConfirmManifestMutation,
   useHoldManifestMutation,
   useMarkManifestExportedMutation,
+  useGetJobUpdatesQuery,
+  useApplyJobUpdateMutation,
+  useDismissJobUpdateMutation,
 } = hawbApi;

@@ -3,13 +3,17 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ChevronRight, Package, Weight, CalendarDays, User, MapPin, CheckCircle2, Clock3, Hash, Tag } from 'lucide-react';
+import { ChevronRight, Package, Weight, CalendarDays, User, MapPin, CheckCircle2, Clock3, Hash, Tag, Check, X, FileText } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
-import { useGetHawbManifestsQuery, type HawbManifest } from '@/services/hawbApi';
+import {
+  useGetHawbManifestsQuery, useGetJobUpdatesQuery, useApplyJobUpdateMutation, useDismissJobUpdateMutation,
+  type HawbManifest, type HawbJob, type HawbJobPendingUpdate,
+} from '@/services/hawbApi';
 import { useManifestsLiveRefresh } from '@/hooks/useManifestsLiveRefresh';
 import ApiErrorState from '@/components/ApiErrorState';
 
 const STATUS_BADGE: Record<string, string> = {
+  pending_review: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/60',
   open: 'bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-navy-300 ring-1 ring-gray-200 dark:ring-navy-700',
   booked: 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-800/60',
   confirmed: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800/60',
@@ -18,6 +22,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
+  pending_review: 'Pending Review',
   open: 'Open',
   booked: 'Booked',
   confirmed: 'Confirmed',
@@ -54,11 +59,121 @@ function routeLabel(m: HawbManifest): string {
   return `${m.start_point || '—'} → ${m.end_point || '—'}`;
 }
 
-export default function ManifestsPage() {
-  const [tab, setTab] = useState<'manifests' | 'pending'>('manifests');
-  const { data: manifests = [], isLoading, isError, refetch } = useGetHawbManifestsQuery(
-    tab === 'pending' ? { needsReview: true } : undefined
+const UPDATE_FIELD_LABELS: Record<string, string> = {
+  shipper: 'Shipper',
+  consignee: 'Consignee',
+  collection_at: 'Collection',
+  delivery_at: 'Delivery',
+  package_qty: 'Package Qty',
+  weight_kg: 'Weight (kg)',
+  dangerous_goods: 'Dangerous Goods',
+  dangerous_goods_notes: 'DG Notes',
+  client_account: 'Client Account',
+  package_sequence: 'Package Sequence',
+  shipper_contact: 'Shipper Contact',
+  shipper_phone: 'Shipper Phone',
+  shipper_reference: 'Shipper Reference',
+  consignee_contact: 'Consignee Contact',
+  consignee_phone: 'Consignee Phone',
+  consignee_reference: 'Consignee Reference',
+  temperature_range: 'Temperature',
+  dimensions: 'Dimensions',
+  volumetric_weight_kg: 'Vol. Weight (kg)',
+  declared_value: 'Declared Value',
+  declared_value_currency: 'Currency',
+  direction: 'Direction',
+  special_handling: 'Special Handling',
+};
+
+function formatFieldValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  return String(value);
+}
+
+function computeFieldDiff(job: HawbJob, proposed: Record<string, unknown>) {
+  const diffs: { field: string; label: string; oldValue: string; newValue: string }[] = [];
+  for (const [field, label] of Object.entries(UPDATE_FIELD_LABELS)) {
+    const oldStr = formatFieldValue((job as unknown as Record<string, unknown>)[field]);
+    const newStr = formatFieldValue(proposed[field]);
+    if (oldStr !== newStr) diffs.push({ field, label, oldValue: oldStr, newValue: newStr });
+  }
+  return diffs;
+}
+
+const UPDATE_REASON_LABEL: Record<HawbJobPendingUpdate['reason'], string> = {
+  duplicate_resend: 'Duplicate resend',
+  blind_companion_merge: 'Blind companion match',
+};
+
+function JobUpdateCard({ update }: { update: HawbJobPendingUpdate }) {
+  const [applyUpdate, { isLoading: applying }] = useApplyJobUpdateMutation();
+  const [dismissUpdate, { isLoading: dismissing }] = useDismissJobUpdateMutation();
+  const diffs = computeFieldDiff(update.job, update.proposed_data);
+  const busy = applying || dismissing;
+
+  return (
+    <div className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm p-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="font-mono font-bold text-blue-600 dark:text-blue-400 text-[13px]">{update.job.hawb_number}</span>
+          <span className={`inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-full ${
+            update.reason === 'blind_companion_merge'
+              ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/60'
+              : 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-800/60'
+          }`}>
+            {UPDATE_REASON_LABEL[update.reason]}
+          </span>
+          {update.job.locked && (
+            <span className="inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800/60">
+              Manifest already exported
+            </span>
+          )}
+        </div>
+        <span className="flex items-center gap-1 text-[10.5px] text-gray-400 dark:text-navy-500">
+          <FileText size={11} /> {update.source_document.filename}
+        </span>
+      </div>
+
+      {diffs.length > 0 ? (
+        <div className="mt-3 rounded-xl border border-gray-100 dark:border-navy-800 divide-y divide-gray-100 dark:divide-navy-800 overflow-hidden">
+          {diffs.map(d => (
+            <div key={d.field} className="grid grid-cols-[130px_1fr_16px_1fr] items-center gap-2 px-3 py-1.5 text-[11.5px]">
+              <span className="font-bold text-gray-500 dark:text-navy-400">{d.label}</span>
+              <span className="text-gray-400 dark:text-navy-500 line-through truncate">{d.oldValue}</span>
+              <ChevronRight size={12} className="text-gray-300 dark:text-navy-600" />
+              <span className="text-gray-800 dark:text-gray-100 font-semibold truncate">{d.newValue}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 text-[11.5px] text-gray-400 dark:text-navy-500">No field-level differences detected — new packages/notes data may still apply.</p>
+      )}
+
+      <div className="flex items-center justify-end gap-2 mt-3">
+        <button
+          onClick={() => dismissUpdate(update.id)}
+          disabled={busy}
+          className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-500 dark:text-navy-400 bg-gray-50 dark:bg-navy-800 hover:bg-gray-100 dark:hover:bg-navy-700 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors"
+        >
+          <X size={12} /> Dismiss
+        </button>
+        <button
+          onClick={() => applyUpdate(update.id)}
+          disabled={busy}
+          className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors"
+        >
+          <Check size={12} /> {applying ? 'Applying…' : 'Apply update'}
+        </button>
+      </div>
+    </div>
   );
+}
+
+export default function ManifestsPage() {
+  const [tab, setTab] = useState<'manifests' | 'updates'>('manifests');
+  const { data: manifests = [], isLoading, isError, refetch } = useGetHawbManifestsQuery();
+  const { data: jobUpdates = [], isLoading: updatesLoading, isError: updatesError, refetch: refetchUpdates } = useGetJobUpdatesQuery();
   const [layout, setLayout] = useState<1 | 2 | 3>(1);
   useManifestsLiveRefresh();
 
@@ -67,7 +182,9 @@ export default function ManifestsPage() {
       <motion.div variants={staggerItem} className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-base font-black text-gray-900 dark:text-gray-100 leading-tight">Manifests</h1>
-          <p className="text-[11px] text-gray-400 dark:text-navy-500 mt-0.5">{manifests.length} manifests</p>
+          <p className="text-[11px] text-gray-400 dark:text-navy-500 mt-0.5">
+            {tab === 'updates' ? `${jobUpdates.length} pending updates` : `${manifests.length} manifests`}
+          </p>
         </div>
         <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-navy-800 rounded-lg p-0.5 shrink-0">
           {([1, 2, 3] as const).map(n => (
@@ -90,23 +207,46 @@ export default function ManifestsPage() {
       <motion.div variants={staggerItem} className="flex items-center gap-1 border-b border-gray-100 dark:border-navy-800">
         {([
           { key: 'manifests' as const, label: 'Manifests' },
-          { key: 'pending' as const, label: 'Pending Review' },
+          { key: 'updates' as const, label: 'Updates', count: jobUpdates.length },
         ]).map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-3 py-2 text-[12px] font-bold border-b-2 -mb-px transition-colors ${
+            className={`px-3 py-2 text-[12px] font-bold border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${
               tab === t.key
                 ? 'border-emerald-500 text-gray-900 dark:text-gray-100'
                 : 'border-transparent text-gray-400 dark:text-navy-500 hover:text-gray-600 dark:hover:text-navy-300'
             }`}
           >
             {t.label}
+            {!!t.count && t.count > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[9px] font-bold rounded-full bg-red-500 text-white">
+                {t.count}
+              </span>
+            )}
           </button>
         ))}
       </motion.div>
 
-      {isLoading ? (
+      {tab === 'updates' ? (
+        updatesLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-24 bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 animate-pulse" />
+            ))}
+          </div>
+        ) : updatesError ? (
+          <ApiErrorState title="Failed to load pending updates" onRetry={refetchUpdates} />
+        ) : jobUpdates.length === 0 ? (
+          <div className="flex items-center justify-center h-48 text-gray-300 dark:text-navy-600 text-sm bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800">
+            No pending updates
+          </div>
+        ) : (
+          <motion.div variants={staggerItem} className="space-y-3">
+            {jobUpdates.map(u => <JobUpdateCard key={u.id} update={u} />)}
+          </motion.div>
+        )
+      ) : isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="h-12 bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 animate-pulse" />
@@ -116,7 +256,7 @@ export default function ManifestsPage() {
         <ApiErrorState title="Failed to load manifests" onRetry={refetch} />
       ) : manifests.length === 0 ? (
         <div className="flex items-center justify-center h-48 text-gray-300 dark:text-navy-600 text-sm bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800">
-          {tab === 'pending' ? 'Nothing pending review' : 'No manifests yet'}
+          No manifests yet
         </div>
       ) : layout === 1 ? (
         /* Layout 1 — enhanced data table */
@@ -151,11 +291,8 @@ export default function ManifestsPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className={`inline-flex items-center text-[9.5px] font-bold px-2 py-0.5 rounded-full ${STATUS_BADGE[m.status]}`}>
-                          {STATUS_LABEL[m.status]}
-                        </span>
-                        <BlindBadge sourceKind={m.source_kind} />
+                      <span className={`inline-flex items-center text-[9.5px] font-bold px-2 py-0.5 rounded-full ${STATUS_BADGE[m.status]}`}>
+                        {STATUS_LABEL[m.status]}
                       </span>
                     </td>
                     <td className="px-4 py-4 text-[12px] font-semibold text-gray-800 dark:text-navy-200">{m.job_count}</td>
