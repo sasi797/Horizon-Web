@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, ChevronDown, Check, Download, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Truck, GripVertical, ArrowLeftRight, Ruler, Banknote, Building2, MapPin, Phone, Hash } from 'lucide-react';
+import { ChevronRight, ChevronDown, Check, X, Copy, Download, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Truck, GripVertical, ArrowLeftRight, Ruler, Banknote, Building2, MapPin, Phone, Hash, RefreshCw } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestQuery,
@@ -14,10 +14,15 @@ import {
   useConfirmManifestMutation,
   useHoldManifestMutation,
   useMarkManifestExportedMutation,
+  useGetJobUpdatesQuery,
+  useApplyJobUpdateMutation,
+  useDismissJobUpdateMutation,
   type HawbJob,
 } from '@/services/hawbApi';
 import ApiErrorState from '@/components/ApiErrorState';
+import Tooltip from '@/components/Tooltip';
 import { splitAddress, cityLine, postcodeLine } from '@/lib/hawbFormat';
+import { computeFieldDiff } from '@/lib/hawbUpdateDiff';
 
 const MANIFEST_STATUS_BADGE: Record<string, string> = {
   pending_review: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/60',
@@ -66,6 +71,30 @@ function pageRangeLabel(job: HawbJob): string | null {
   const count = job.packages.length || 1;
   const end = job.page_start + count - 1;
   return count > 1 ? `Pages ${job.page_start}–${end}` : `Page ${job.page_start}`;
+}
+
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  if (!value || value === '—') return null;
+  return (
+    <Tooltip content={copied ? 'Copied!' : 'Copy'} side="bottom">
+      <button
+        type="button"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(value);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1200);
+          } catch {
+            // no-op — clipboard permission denied
+          }
+        }}
+        className="p-1 rounded-md text-gray-300 dark:text-navy-600 hover:text-gray-600 dark:hover:text-navy-300 hover:bg-gray-100 dark:hover:bg-navy-800 transition-colors"
+      >
+        {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+      </button>
+    </Tooltip>
+  );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -233,6 +262,9 @@ export default function ManifestDetailPage() {
   const [confirmManifest, { isLoading: confirming }] = useConfirmManifestMutation();
   const [holdManifest, { isLoading: holding }] = useHoldManifestMutation();
   const [markExported, { isLoading: markingExported }] = useMarkManifestExportedMutation();
+  const { data: jobUpdates = [] } = useGetJobUpdatesQuery();
+  const [applyJobUpdate, { isLoading: applyingUpdate }] = useApplyJobUpdateMutation();
+  const [dismissJobUpdate, { isLoading: dismissingUpdate }] = useDismissJobUpdateMutation();
 
   const [orderedJobs, setOrderedJobs] = useState<HawbJob[]>([]);
   const [syncedJobs, setSyncedJobs] = useState<HawbJob[] | undefined>(undefined);
@@ -275,6 +307,8 @@ export default function ManifestDetailPage() {
   const locked = manifest.status !== 'open' && manifest.status !== 'pending_review';
   const dgCount = orderedJobs.filter(j => j.dangerous_goods).length;
   const packageCount = orderedJobs.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
+  const jobIdsWithUpdates = new Set(jobUpdates.map(u => u.job_id));
+  const selectedJobUpdates = selectedJob ? jobUpdates.filter(u => u.job_id === selectedJob.id) : [];
 
   // Start/end point pickers offer the collection & delivery addresses already present on
   // this manifest's run, so choosing a start point can auto-fill its matching end point.
@@ -395,6 +429,22 @@ export default function ManifestDetailPage() {
   const handleMarkExported = async () => {
     try {
       await markExported(manifest.id).unwrap();
+    } catch {
+      // no-op
+    }
+  };
+
+  const handleApplyUpdate = async (updateId: string) => {
+    try {
+      await applyJobUpdate(updateId).unwrap();
+    } catch {
+      // no-op
+    }
+  };
+
+  const handleDismissUpdate = async (updateId: string) => {
+    try {
+      await dismissJobUpdate(updateId).unwrap();
     } catch {
       // no-op
     }
@@ -526,6 +576,67 @@ export default function ManifestDetailPage() {
                 transition={{ duration: 0.2, ease: 'easeOut' }}
                 className="space-y-6"
               >
+                {selectedJobUpdates.map(update => (
+                  <div key={update.id} className="rounded-2xl bg-orange-50/60 dark:bg-orange-950/10 border border-orange-100 dark:border-orange-900/40 p-4">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-orange-700 dark:text-orange-400 uppercase tracking-wide">
+                          <RefreshCw size={11} />
+                          {update.reason === 'blind_companion_merge' ? 'Blind companion match' : 'Duplicate resend'}
+                        </span>
+                        {update.job.locked && (
+                          <span className="inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800/60">
+                            Manifest already exported
+                          </span>
+                        )}
+                      </div>
+                      <span className="flex items-center gap-1 text-[10.5px] text-gray-400 dark:text-navy-500">
+                        <FileText size={11} /> {update.source_document.filename}
+                      </span>
+                    </div>
+
+                    {(() => {
+                      const diffs = computeFieldDiff(update.job, update.proposed_data);
+                      return diffs.length > 0 ? (
+                        <div className="mt-3 rounded-xl border border-orange-100 dark:border-orange-900/40 bg-white dark:bg-navy-900 divide-y divide-orange-50 dark:divide-navy-800 overflow-hidden">
+                          {diffs.map(d => (
+                            <div key={d.field} className="grid grid-cols-[120px_1fr_16px_1fr_20px] items-center gap-2 px-3 py-1.5 text-[11.5px]">
+                              <span className="font-bold text-gray-500 dark:text-navy-400">{d.label}</span>
+                              <Tooltip content={d.oldValue} side="bottom" className="block min-w-0">
+                                <span className="block text-gray-400 dark:text-navy-500 line-through truncate">{d.oldValue}</span>
+                              </Tooltip>
+                              <ChevronRight size={12} className="text-gray-300 dark:text-navy-600" />
+                              <Tooltip content={d.newValue} side="bottom" className="block min-w-0">
+                                <span className="block text-gray-800 dark:text-gray-100 font-semibold truncate">{d.newValue}</span>
+                              </Tooltip>
+                              <CopyButton value={d.newValue} />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-[11.5px] text-gray-400 dark:text-navy-500">No field-level differences detected — new packages/notes data may still apply.</p>
+                      );
+                    })()}
+
+                    <div className="flex items-center justify-end gap-2 mt-3">
+                      <button
+                        onClick={() => handleDismissUpdate(update.id)}
+                        disabled={applyingUpdate || dismissingUpdate}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-500 dark:text-navy-400 bg-gray-50 dark:bg-navy-800 hover:bg-gray-100 dark:hover:bg-navy-700 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        <X size={12} /> Dismiss
+                      </button>
+                      <button
+                        onClick={() => handleApplyUpdate(update.id)}
+                        disabled={applyingUpdate || dismissingUpdate}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        <Check size={12} /> {applyingUpdate ? 'Applying…' : 'Apply update'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
                 {selectedJob.source_kind === 'blind' && manifest.document.email_body_text && (
                   <details className="rounded-2xl bg-amber-50/60 dark:bg-amber-950/10 border border-amber-100 dark:border-amber-900/40 px-4 py-3">
                     <summary className="text-[10.5px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wide cursor-pointer select-none">
@@ -990,6 +1101,11 @@ export default function ManifestDetailPage() {
                             <TriangleAlert size={9} /> DG
                           </span>
                         )}
+                        {jobIdsWithUpdates.has(job.id) && (
+                          <span title="Pending update — see Job details" className="inline-flex items-center gap-1 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 px-1.5 py-0.5 rounded-full">
+                            <RefreshCw size={9} />
+                          </span>
+                        )}
                         <ChevronRight size={14} className={selected ? 'text-emerald-500 shrink-0' : 'text-gray-300 dark:text-navy-600 shrink-0'} />
                       </div>
                     </div>
@@ -1062,6 +1178,11 @@ export default function ManifestDetailPage() {
                             <TriangleAlert size={9} /> DG
                           </span>
                         )}
+                        {jobIdsWithUpdates.has(job.id) && (
+                          <span title="Pending update — see Job details" className="inline-flex items-center gap-1 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 px-1.5 py-0.5 rounded-full">
+                            <RefreshCw size={9} />
+                          </span>
+                        )}
                         {pages && (
                           <span className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-1.5 py-0.5 rounded-full">
                             <FileText size={9} /> {pages}
@@ -1095,6 +1216,7 @@ export default function ManifestDetailPage() {
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{job.hawb_number}</span>
                         {job.dangerous_goods_notes && <TriangleAlert size={10} className="text-red-500 shrink-0" />}
+                        {jobIdsWithUpdates.has(job.id) && <RefreshCw size={10} className="text-orange-500 shrink-0" />}
                         {pages && <FileText size={10} className="text-blue-500 shrink-0" />}
                       </div>
                       <p className="text-gray-400 dark:text-navy-500 truncate text-[10px] mt-0.5">{routeLine(job)}</p>
@@ -1139,6 +1261,11 @@ export default function ManifestDetailPage() {
                         {job.dangerous_goods_notes && (
                           <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded-full">
                             <TriangleAlert size={9} /> {job.dangerous_goods_notes}
+                          </span>
+                        )}
+                        {jobIdsWithUpdates.has(job.id) && (
+                          <span title="Pending update — see Job details" className="inline-flex items-center gap-1 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 px-1.5 py-0.5 rounded-full">
+                            <RefreshCw size={9} />
                           </span>
                         )}
                       </div>
@@ -1197,6 +1324,11 @@ export default function ManifestDetailPage() {
                       {job.dangerous_goods_notes && (
                         <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded-full">
                           <TriangleAlert size={9} /> {job.dangerous_goods_notes}
+                        </span>
+                      )}
+                      {jobIdsWithUpdates.has(job.id) && (
+                        <span title="Pending update — see Job details" className="inline-flex items-center gap-1 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 px-1.5 py-0.5 rounded-full">
+                          <RefreshCw size={9} />
                         </span>
                       )}
                     </div>

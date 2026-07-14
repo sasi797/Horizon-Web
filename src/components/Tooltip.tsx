@@ -41,7 +41,7 @@ export default function Tooltip({
   useLayoutEffect(() => {
     if (!open || !coords || !tooltipRef.current) return;
     const rect = tooltipRef.current.getBoundingClientRect();
-    const margin = 8;
+    const margin = 12;
     let { top, left } = coords;
     if (rect.left < margin) left += margin - rect.left;
     else if (rect.right > window.innerWidth - margin) left -= rect.right - (window.innerWidth - margin);
@@ -86,7 +86,7 @@ export default function Tooltip({
               exit={{ opacity: 0, scale: 0.92 }}
               transition={{ duration: 0.12, ease: 'easeOut' }}
               style={{ position: 'fixed', top: coords.top, left: coords.left, transform: TRANSLATE[side] }}
-              className="z-[100] pointer-events-none px-2.5 py-1.5 rounded-lg bg-gray-900/95 dark:bg-navy-800/95 backdrop-blur-sm text-white text-[11px] font-semibold shadow-lg ring-1 ring-black/5 dark:ring-white/10 whitespace-nowrap"
+              className="z-[100] pointer-events-none max-w-[260px] px-2.5 py-1.5 rounded-lg bg-gray-900/95 dark:bg-navy-800/95 backdrop-blur-sm text-white text-[11px] font-semibold leading-snug shadow-lg ring-1 ring-black/5 dark:ring-white/10 whitespace-normal break-words"
             >
               {content}
             </motion.span>
