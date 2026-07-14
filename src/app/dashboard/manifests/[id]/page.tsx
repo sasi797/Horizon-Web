@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Check, Download, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, ArrowLeftRight, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Weight, Navigation, Flag } from 'lucide-react';
+import { ChevronDown, Check, Download, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, ArrowLeftRight, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Weight, Navigation, Flag } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestQuery,
@@ -485,17 +485,23 @@ export default function ManifestDetailPage() {
             <button
               onClick={handleExport}
               disabled={exporting}
-              className="flex items-center gap-1.5 text-[12.5px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 px-3.5 py-1.5 rounded-lg transition-colors shrink-0"
+              className="flex items-center gap-1.5 text-[11.5px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-60 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
             >
-              <Download size={14} /> {exporting ? 'Exporting…' : 'Export manifest'}
+              <span className="flex items-center justify-center w-4 h-4 rounded bg-white/15">
+                <FileDown size={11} strokeWidth={2.25} />
+              </span>
+              {exporting ? 'Exporting…' : 'Export manifest'}
             </button>
           )}
           <button
             onClick={() => window.open(manifest.pdf_url, '_blank', 'noopener,noreferrer')}
             title="View full PDF in a new tab"
-            className="flex items-center gap-1.5 text-[12.5px] font-semibold text-gray-600 dark:text-navy-300 bg-white dark:bg-navy-900 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-800 hover:text-gray-800 dark:hover:text-navy-100 px-3.5 py-1.5 rounded-lg transition-colors shrink-0"
+            className="flex items-center gap-1.5 text-[11.5px] font-semibold text-gray-600 dark:text-navy-300 bg-white dark:bg-navy-900 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-800 hover:text-gray-800 dark:hover:text-navy-100 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
           >
-            <ExternalLink size={14} /> View PDF
+            <span className="flex items-center justify-center w-4 h-4 rounded bg-gray-100 dark:bg-navy-800">
+              <FileText size={11} strokeWidth={2.25} />
+            </span>
+            View PDF
           </button>
         </div>
       </motion.div>
