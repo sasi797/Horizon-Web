@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ChevronRight, ArrowRight, Package, Weight, CalendarDays, User, MapPin, CheckCircle2, Clock3, Hash, Tag } from 'lucide-react';
+import { ChevronRight, Package, Weight, CalendarDays, User, MapPin, CheckCircle2, Clock3, Hash, Tag } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import { useGetHawbManifestsQuery, type HawbManifest } from '@/services/hawbApi';
 import { useManifestsLiveRefresh } from '@/hooks/useManifestsLiveRefresh';
@@ -38,6 +38,13 @@ function formatDate(value: string): string {
   return new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function formatDateTime(value: string): string {
+  const d = new Date(value);
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  return `${date} ${time}`;
+}
+
 function initials(name: string | null): string {
   if (!name) return 'SY';
   return name.split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -45,21 +52,6 @@ function initials(name: string | null): string {
 
 function routeLabel(m: HawbManifest): string {
   return `${m.start_point || '—'} → ${m.end_point || '—'}`;
-}
-
-function LocationTooltip({ value, className, children }: { value: string | null; className?: string; children: React.ReactNode }) {
-  if (!value) return <span className={className}>{children}</span>;
-  return (
-    <span className="relative group inline-block max-w-full align-bottom">
-      <span className={className}>{children}</span>
-      <span className="pointer-events-none absolute left-1/2 bottom-full z-30 mb-2.5 -translate-x-1/2 origin-bottom scale-95 opacity-0 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
-        <span className="block w-max max-w-[240px] rounded-xl bg-gray-900 dark:bg-black px-3 py-2.5 text-left text-[11px] font-medium leading-relaxed text-white shadow-xl ring-1 ring-black/10 dark:ring-white/10 whitespace-pre-line">
-          {value}
-        </span>
-        <span className="absolute left-1/2 top-full -mt-1 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-gray-900 dark:bg-black" />
-      </span>
-    </span>
-  );
 }
 
 export default function ManifestsPage() {
@@ -138,7 +130,6 @@ export default function ManifestsPage() {
                     { label: 'Status', icon: Tag },
                     { label: 'Jobs', icon: Package },
                     { label: 'Total Weight (kg)', icon: Weight },
-                    { label: 'Route', icon: MapPin },
                     { label: 'Operator', icon: User },
                     { label: 'Created', icon: CalendarDays },
                   ].map(h => (
@@ -169,23 +160,8 @@ export default function ManifestsPage() {
                     </td>
                     <td className="px-4 py-4 text-[12px] font-semibold text-gray-800 dark:text-navy-200">{m.job_count}</td>
                     <td className="px-4 py-4 text-[12px] font-semibold text-gray-800 dark:text-navy-200">{m.total_weight_kg}</td>
-                    <td className="px-4 py-4 max-w-[280px]">
-                      {m.start_point || m.end_point ? (
-                        <div className="flex items-center gap-1.5 text-[11.5px] font-medium text-gray-700 dark:text-navy-300">
-                          <LocationTooltip value={m.start_point} className="block truncate max-w-[110px] cursor-default">
-                            {m.start_point || '—'}
-                          </LocationTooltip>
-                          <ArrowRight size={13} className="text-gray-400 dark:text-navy-500 shrink-0" />
-                          <LocationTooltip value={m.end_point} className="block truncate max-w-[110px] cursor-default">
-                            {m.end_point || '—'}
-                          </LocationTooltip>
-                        </div>
-                      ) : (
-                        <span className="text-[11.5px] text-gray-300 dark:text-navy-600">—</span>
-                      )}
-                    </td>
                     <td className="px-4 py-4 text-[11.5px] font-medium text-gray-700 dark:text-navy-300 whitespace-nowrap">{m.created_by_name ?? 'System'}</td>
-                    <td className="px-4 py-4 text-[11px] font-medium text-gray-600 dark:text-navy-400 whitespace-nowrap">{formatDate(m.created_at)}</td>
+                    <td className="px-4 py-4 text-[11px] font-medium text-gray-600 dark:text-navy-400 whitespace-nowrap">{formatDateTime(m.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
