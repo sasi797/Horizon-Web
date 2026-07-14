@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, ChevronDown, Check, X, Copy, Download, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Truck, GripVertical, ArrowLeftRight, Ruler, Banknote, Building2, MapPin, Phone, Hash, RefreshCw } from 'lucide-react';
+import { ChevronDown, Check, Download, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, ArrowLeftRight, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Weight, Navigation, Flag } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestQuery,
@@ -16,21 +16,19 @@ import {
   useMarkManifestExportedMutation,
   useGetJobUpdatesQuery,
   useApplyJobUpdateMutation,
-  useDismissJobUpdateMutation,
   type HawbJob,
 } from '@/services/hawbApi';
 import ApiErrorState from '@/components/ApiErrorState';
 import Tooltip from '@/components/Tooltip';
 import { splitAddress, cityLine, postcodeLine } from '@/lib/hawbFormat';
-import { computeFieldDiff } from '@/lib/hawbUpdateDiff';
 
 const MANIFEST_STATUS_BADGE: Record<string, string> = {
-  pending_review: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/60',
-  open: 'bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-navy-300 ring-1 ring-gray-200 dark:ring-navy-700',
-  booked: 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-800/60',
-  confirmed: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800/60',
-  on_hold: 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800/60',
-  exported: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800/60',
+  pending_review: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+  open: 'bg-slate-200 dark:bg-navy-700 text-slate-700 dark:text-navy-200',
+  booked: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+  confirmed: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+  on_hold: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+  exported: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
 };
 
 const MANIFEST_STATUS_LABEL: Record<string, string> = {
@@ -73,31 +71,7 @@ function pageRangeLabel(job: HawbJob): string | null {
   return count > 1 ? `Pages ${job.page_start}–${end}` : `Page ${job.page_start}`;
 }
 
-function CopyButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  if (!value || value === '—') return null;
-  return (
-    <Tooltip content={copied ? 'Copied!' : 'Copy'} side="bottom">
-      <button
-        type="button"
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(value);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1200);
-          } catch {
-            // no-op — clipboard permission denied
-          }
-        }}
-        className="p-1 rounded-md text-gray-300 dark:text-navy-600 hover:text-gray-600 dark:hover:text-navy-300 hover:bg-gray-100 dark:hover:bg-navy-800 transition-colors"
-      >
-        {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-      </button>
-    </Tooltip>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
       <label className="block text-[10px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide mb-1.5">{label}</label>
@@ -263,39 +237,68 @@ export default function ManifestDetailPage() {
   const [holdManifest, { isLoading: holding }] = useHoldManifestMutation();
   const [markExported, { isLoading: markingExported }] = useMarkManifestExportedMutation();
   const { data: jobUpdates = [] } = useGetJobUpdatesQuery();
-  const [applyJobUpdate, { isLoading: applyingUpdate }] = useApplyJobUpdateMutation();
-  const [dismissJobUpdate, { isLoading: dismissingUpdate }] = useDismissJobUpdateMutation();
+  const [applyJobUpdate] = useApplyJobUpdateMutation();
 
   const [orderedJobs, setOrderedJobs] = useState<HawbJob[]>([]);
   const [syncedJobs, setSyncedJobs] = useState<HawbJob[] | undefined>(undefined);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [cardDesign, setCardDesign] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [jobForm, setJobForm] = useState<JobForm | null>(null);
   const [syncedFormFor, setSyncedFormFor] = useState<string | null>(null);
   const [points, setPoints] = useState({ start_point: '', end_point: '' });
   const [syncedPointsFor, setSyncedPointsFor] = useState<string | undefined>(undefined);
 
-  if (manifest && manifest.jobs !== syncedJobs) {
-    setSyncedJobs(manifest.jobs);
-    setOrderedJobs(manifest.jobs);
-  }
-  if (manifest && syncedPointsFor !== manifest.id) {
-    setSyncedPointsFor(manifest.id);
-    setPoints({ start_point: manifest.start_point ?? '', end_point: manifest.end_point ?? '' });
-  }
-  if (selectedJobId === null && orderedJobs.length > 0) {
-    setSelectedJobId(orderedJobs[0].id);
-  }
+  // Auto-apply pending blind-companion/duplicate merges as soon as they're seen —
+  // no manual "Apply" click needed. Already-exported (locked) jobs are the one
+  // exception: those stay manual so an already-sent manifest is never silently
+  // rewritten without a person choosing to.
+  const autoAppliedRef = useRef<Set<string>>(new Set());
+  const manifestJobIds = new Set((manifest?.jobs ?? []).map(j => j.id));
+  const autoApplyIds = jobUpdates
+    .filter(u => manifestJobIds.has(u.job_id) && !u.job.locked)
+    .map(u => u.id)
+    .join(',');
+  useEffect(() => {
+    if (!autoApplyIds) return;
+    for (const id of autoApplyIds.split(',')) {
+      if (!autoAppliedRef.current.has(id)) {
+        autoAppliedRef.current.add(id);
+        applyJobUpdate(id);
+      }
+    }
+  }, [autoApplyIds, applyJobUpdate]);
+
+  useEffect(() => {
+    if (manifest && manifest.jobs !== syncedJobs) {
+      setSyncedJobs(manifest.jobs);
+      setOrderedJobs(manifest.jobs);
+    }
+  }, [manifest, syncedJobs]);
+
+  useEffect(() => {
+    if (manifest && syncedPointsFor !== manifest.id) {
+      setSyncedPointsFor(manifest.id);
+      setPoints({ start_point: manifest.start_point ?? '', end_point: manifest.end_point ?? '' });
+    }
+  }, [manifest, syncedPointsFor]);
+
+  useEffect(() => {
+    if (selectedJobId === null && orderedJobs.length > 0) {
+      setSelectedJobId(orderedJobs[0].id);
+    }
+  }, [selectedJobId, orderedJobs]);
+
   const selectedJob = orderedJobs.find(j => j.id === selectedJobId) ?? orderedJobs[0] ?? null;
-  if (selectedJob && syncedFormFor !== selectedJob.id) {
-    setSyncedFormFor(selectedJob.id);
-    setJobForm(formFromJob(selectedJob));
-  }
-  if (!selectedJob && syncedFormFor !== null) {
-    setSyncedFormFor(null);
-    setJobForm(null);
-  }
+
+  useEffect(() => {
+    if (selectedJob && syncedFormFor !== selectedJob.id) {
+      setSyncedFormFor(selectedJob.id);
+      setJobForm(formFromJob(selectedJob));
+    } else if (!selectedJob && syncedFormFor !== null) {
+      setSyncedFormFor(null);
+      setJobForm(null);
+    }
+  }, [selectedJob, syncedFormFor]);
 
   if (isLoading) {
     return <div className="h-64 bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 animate-pulse" />;
@@ -308,7 +311,6 @@ export default function ManifestDetailPage() {
   const dgCount = orderedJobs.filter(j => j.dangerous_goods).length;
   const packageCount = orderedJobs.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
   const jobIdsWithUpdates = new Set(jobUpdates.map(u => u.job_id));
-  const selectedJobUpdates = selectedJob ? jobUpdates.filter(u => u.job_id === selectedJob.id) : [];
 
   // Start/end point pickers offer the collection & delivery addresses already present on
   // this manifest's run, so choosing a start point can auto-fill its matching end point.
@@ -434,22 +436,6 @@ export default function ManifestDetailPage() {
     }
   };
 
-  const handleApplyUpdate = async (updateId: string) => {
-    try {
-      await applyJobUpdate(updateId).unwrap();
-    } catch {
-      // no-op
-    }
-  };
-
-  const handleDismissUpdate = async (updateId: string) => {
-    try {
-      await dismissJobUpdate(updateId).unwrap();
-    } catch {
-      // no-op
-    }
-  };
-
   const multiPackage = selectedJob ? selectedJob.packages.length > 1 : false;
   const packagesHaveDetail = selectedJob ? selectedJob.packages.some(p => p.temperature_range || p.dimensions) : false;
   const showCombinedTempDims = !multiPackage || !packagesHaveDetail;
@@ -458,34 +444,56 @@ export default function ManifestDetailPage() {
     <motion.div variants={pageTransition} initial="hidden" animate="visible" className="space-y-4">
       <motion.div variants={staggerItem} className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <button onClick={() => router.push('/dashboard/manifests')} className="text-gray-400 dark:text-navy-500 hover:text-gray-600 dark:hover:text-navy-300 mt-0.5">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button
+            onClick={() => router.push('/dashboard/manifests')}
+            className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 dark:text-navy-500 hover:bg-gray-100 dark:hover:bg-navy-800 hover:text-gray-700 dark:hover:text-navy-200 transition-colors mt-0.5 shrink-0"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base font-black text-gray-900 dark:text-gray-100 leading-tight font-mono">{manifest.reference_number}</h1>
-              <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${MANIFEST_STATUS_BADGE[manifest.status]}`}>
+              <span className={`inline-flex items-center text-[10.5px] font-semibold px-2.5 py-0.5 rounded-full ${MANIFEST_STATUS_BADGE[manifest.status]}`}>
                 {MANIFEST_STATUS_LABEL[manifest.status]}
               </span>
               {manifest.source_kind === 'blind' && (
-                <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/60">
+                <span className="inline-flex items-center text-[10.5px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
                   Blind HAWB
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-gray-400 dark:text-navy-500 mt-0.5">
-              {manifest.document.filename} · Created {formatDate(manifest.created_at)} · operator {initials(manifest.created_by_name)} ·{' '}
-              {manifest.exported_at ? `exported ${formatDate(manifest.exported_at)}` : 'not yet exported'}
+            <p className="text-[11.5px] text-gray-400 dark:text-navy-500 mt-1">
+              {manifest.document.filename}
+              <span className="mx-1.5 text-gray-200 dark:text-navy-700">·</span>
+              Created {formatDate(manifest.created_at)}
+              <span className="mx-1.5 text-gray-200 dark:text-navy-700">·</span>
+              operator {initials(manifest.created_by_name)}
+              <span className="mx-1.5 text-gray-200 dark:text-navy-700">·</span>
+              {manifest.exported_at ? (
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium">exported {formatDate(manifest.exported_at)}</span>
+              ) : 'not yet exported'}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {exportError && (
+            <span className="text-[11px] font-semibold text-red-600 dark:text-red-400">{exportError}</span>
+          )}
+          {manifest.status === 'open' && (
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="flex items-center gap-1.5 text-[12.5px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 px-3.5 py-1.5 rounded-lg transition-colors shrink-0"
+            >
+              <Download size={14} /> {exporting ? 'Exporting…' : 'Export manifest'}
+            </button>
+          )}
           <button
             onClick={() => window.open(manifest.pdf_url, '_blank', 'noopener,noreferrer')}
             title="View full PDF in a new tab"
-            className="flex items-center gap-1.5 text-xs font-bold text-white bg-gray-700 dark:bg-navy-700 hover:bg-gray-800 dark:hover:bg-navy-600 px-3 py-1.5 rounded-full transition-colors shrink-0"
+            className="flex items-center gap-1.5 text-[12.5px] font-semibold text-gray-600 dark:text-navy-300 bg-white dark:bg-navy-900 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-800 hover:text-gray-800 dark:hover:text-navy-100 px-3.5 py-1.5 rounded-lg transition-colors shrink-0"
           >
             <ExternalLink size={14} /> View PDF
           </button>
@@ -494,21 +502,26 @@ export default function ManifestDetailPage() {
 
       <motion.div variants={staggerItem} className="grid grid-cols-4 gap-3">
         {[
-          { label: 'Stops', value: orderedJobs.length },
-          { label: 'Packages', value: packageCount },
-          { label: 'Total weight', value: `${manifest.total_weight_kg.toFixed(2)} kg` },
-          { label: 'Dangerous goods', value: dgCount },
+          { label: 'Stops', value: orderedJobs.length, icon: MapPin, tone: 'text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30' },
+          { label: 'Packages', value: packageCount, icon: PackageIcon, tone: 'text-purple-500 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/30' },
+          { label: 'Total weight', value: `${manifest.total_weight_kg.toFixed(2)} kg`, icon: Weight, tone: 'text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30' },
+          { label: 'Dangerous goods', value: dgCount, icon: TriangleAlert, tone: dgCount > 0 ? 'text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/30' : 'text-gray-400 dark:text-navy-500 bg-gray-50 dark:bg-navy-800/60' },
         ].map(stat => (
-          <div key={stat.label} className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm px-4 py-3">
-            <p className="text-[10px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wider">{stat.label}</p>
-            <p className="text-lg font-black text-gray-900 dark:text-gray-100 mt-0.5">{stat.value}</p>
+          <div key={stat.label} className="flex items-center gap-3 bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-4 py-3">
+            <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${stat.tone}`}>
+              <stat.icon size={15} strokeWidth={2} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-navy-500 uppercase tracking-wide truncate">{stat.label}</p>
+              <p className="text-[15px] font-black text-gray-900 dark:text-gray-100 leading-tight mt-0.5">{stat.value}</p>
+            </div>
           </div>
         ))}
       </motion.div>
 
       <motion.div variants={staggerItem} className="grid grid-cols-2 gap-3">
-        <div className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm px-4 py-3">
-          <Field label="Start point">
+        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-4 py-3">
+          <Field label={<span className="inline-flex items-center gap-1"><Navigation size={10} /> Start point</span>}>
             <LocationSelect
               disabled={locked}
               value={points.start_point}
@@ -526,8 +539,8 @@ export default function ManifestDetailPage() {
             />
           </Field>
         </div>
-        <div className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm px-4 py-3">
-          <Field label="End point">
+        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-4 py-3">
+          <Field label={<span className="inline-flex items-center gap-1"><Flag size={10} /> End point</span>}>
             <LocationSelect
               disabled={locked}
               value={points.end_point}
@@ -576,78 +589,6 @@ export default function ManifestDetailPage() {
                 transition={{ duration: 0.2, ease: 'easeOut' }}
                 className="space-y-6"
               >
-                {selectedJobUpdates.map(update => (
-                  <div key={update.id} className="rounded-2xl bg-orange-50/60 dark:bg-orange-950/10 border border-orange-100 dark:border-orange-900/40 p-4">
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-orange-700 dark:text-orange-400 uppercase tracking-wide">
-                          <RefreshCw size={11} />
-                          {update.reason === 'blind_companion_merge' ? 'Blind companion match' : 'Duplicate resend'}
-                        </span>
-                        {update.job.locked && (
-                          <span className="inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800/60">
-                            Manifest already exported
-                          </span>
-                        )}
-                      </div>
-                      <span className="flex items-center gap-1 text-[10.5px] text-gray-400 dark:text-navy-500">
-                        <FileText size={11} /> {update.source_document.filename}
-                      </span>
-                    </div>
-
-                    {(() => {
-                      const diffs = computeFieldDiff(update.job, update.proposed_data);
-                      return diffs.length > 0 ? (
-                        <div className="mt-3 rounded-xl border border-orange-100 dark:border-orange-900/40 bg-white dark:bg-navy-900 divide-y divide-orange-50 dark:divide-navy-800 overflow-hidden">
-                          {diffs.map(d => (
-                            <div key={d.field} className="grid grid-cols-[120px_1fr_16px_1fr_20px] items-center gap-2 px-3 py-1.5 text-[11.5px]">
-                              <span className="font-bold text-gray-500 dark:text-navy-400">{d.label}</span>
-                              <Tooltip content={d.oldValue} side="bottom" className="block min-w-0">
-                                <span className="block text-gray-400 dark:text-navy-500 line-through truncate">{d.oldValue}</span>
-                              </Tooltip>
-                              <ChevronRight size={12} className="text-gray-300 dark:text-navy-600" />
-                              <Tooltip content={d.newValue} side="bottom" className="block min-w-0">
-                                <span className="block text-gray-800 dark:text-gray-100 font-semibold truncate">{d.newValue}</span>
-                              </Tooltip>
-                              <CopyButton value={d.newValue} />
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="mt-3 text-[11.5px] text-gray-400 dark:text-navy-500">No field-level differences detected — new packages/notes data may still apply.</p>
-                      );
-                    })()}
-
-                    <div className="flex items-center justify-end gap-2 mt-3">
-                      <button
-                        onClick={() => handleDismissUpdate(update.id)}
-                        disabled={applyingUpdate || dismissingUpdate}
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-500 dark:text-navy-400 bg-gray-50 dark:bg-navy-800 hover:bg-gray-100 dark:hover:bg-navy-700 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors"
-                      >
-                        <X size={12} /> Dismiss
-                      </button>
-                      <button
-                        onClick={() => handleApplyUpdate(update.id)}
-                        disabled={applyingUpdate || dismissingUpdate}
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors"
-                      >
-                        <Check size={12} /> {applyingUpdate ? 'Applying…' : 'Apply update'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {selectedJob.source_kind === 'blind' && manifest.document.email_body_text && (
-                  <details className="rounded-2xl bg-amber-50/60 dark:bg-amber-950/10 border border-amber-100 dark:border-amber-900/40 px-4 py-3">
-                    <summary className="text-[10.5px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wide cursor-pointer select-none">
-                      Blind HAWB — source email body (cross-check merged fields)
-                    </summary>
-                    <pre className="mt-2.5 text-[11.5px] text-gray-700 dark:text-navy-300 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
-                      {manifest.document.email_body_text}
-                    </pre>
-                  </details>
-                )}
-
                 {/* At-a-glance journey card */}
                 <div className="rounded-2xl bg-gradient-to-br from-emerald-50/80 to-white dark:from-emerald-950/20 dark:to-navy-900 border border-emerald-100 dark:border-emerald-900/40 p-4">
                   <div className="flex items-center gap-3">
@@ -1033,35 +974,17 @@ export default function ManifestDetailPage() {
                 {locked ? 'Manifest is exported and locked' : 'Drag to reorder — click a row to view its details'}
               </p>
             </div>
-            <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-navy-800 rounded-lg p-0.5 shrink-0">
-              {([1, 2, 3, 4, 5] as const).map(n => (
-                <button
-                  key={n}
-                  onClick={() => setCardDesign(n)}
-                  title={`Design ${n}`}
-                  className={`w-6 h-6 flex items-center justify-center text-[10px] font-bold rounded-md transition-colors ${
-                    cardDesign === n
-                      ? 'bg-white dark:bg-navy-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                      : 'text-gray-400 dark:text-navy-500 hover:text-gray-600 dark:hover:text-navy-300'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
           </div>
 
-          <div className={`flex-1 overflow-y-auto ${cardDesign === 2 ? 'p-3 space-y-2' : 'divide-y divide-gray-50 dark:divide-navy-800/70'}`}>
-            {cardDesign === 3 && (
-              <div className="grid grid-cols-[24px_1fr_56px_56px_44px_50px] gap-2 px-4 py-2 text-[9px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800 sticky top-0 bg-white dark:bg-navy-900">
-                <span>#</span>
-                <span>HAWB · Route</span>
-                <span className="text-right">Coll.</span>
-                <span className="text-right">Del.</span>
-                <span className="text-right">Pkg</span>
-                <span className="text-right">Wt (kg)</span>
-              </div>
-            )}
+          <div className="flex-1 overflow-y-auto divide-y divide-gray-50 dark:divide-navy-800/70">
+            <div className="grid grid-cols-[24px_1fr_56px_56px_44px_50px] gap-2 px-4 py-2 text-[9px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800 sticky top-0 bg-white dark:bg-navy-900">
+              <span>#</span>
+              <span>HAWB · Route</span>
+              <span className="text-right">Coll.</span>
+              <span className="text-right">Del.</span>
+              <span className="text-right">Pkg</span>
+              <span className="text-right">Wt (kg)</span>
+            </div>
             {orderedJobs.map((job, index) => {
               const selected = selectedJobId === job.id;
               const pages = pageRangeLabel(job);
@@ -1073,308 +996,34 @@ export default function ManifestDetailPage() {
                 onClick: () => setSelectedJobId(job.id),
               };
 
-              /* Design 1 — boarding-pass style route ticket */
-              if (cardDesign === 1) {
-                return (
-                  <div
-                    key={job.id}
-                    {...dragProps}
-                    className={`px-4 py-4 cursor-pointer transition-colors ${
-                      selected ? 'bg-emerald-50/60 dark:bg-emerald-950/20' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2.5">
-                      <span className="text-[10px] font-bold text-gray-400 dark:text-navy-500">
-                        Stop {index + 1} · <span className="font-mono text-gray-600 dark:text-navy-300">{job.hawb_number}</span>
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        {job.client_account && (
-                          <span className="text-[9px] font-bold text-gray-500 dark:text-navy-400 bg-gray-100 dark:bg-navy-800 px-1.5 py-0.5 rounded-full">{job.client_account}</span>
-                        )}
-                        {pages && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-1.5 py-0.5 rounded-full">
-                            <FileText size={9} /> {pages}
-                          </span>
-                        )}
-                        {job.dangerous_goods_notes && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded-full">
-                            <TriangleAlert size={9} /> DG
-                          </span>
-                        )}
-                        {jobIdsWithUpdates.has(job.id) && (
-                          <span title="Pending update — see Job details" className="inline-flex items-center gap-1 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 px-1.5 py-0.5 rounded-full">
-                            <RefreshCw size={9} />
-                          </span>
-                        )}
-                        <ChevronRight size={14} className={selected ? 'text-emerald-500 shrink-0' : 'text-gray-300 dark:text-navy-600 shrink-0'} />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className="text-left w-[92px] shrink-0">
-                        <p className="text-[17px] font-black text-gray-900 dark:text-gray-100 tabular-nums leading-none">
-                          {job.collection_at ? formatTime(job.collection_at) : '—'}
-                        </p>
-                        <p className="text-[9.5px] text-gray-400 dark:text-navy-500 truncate mt-1">{splitAddress(job.shipper).name || '—'}</p>
-                      </div>
-
-                      <div className="flex-1 flex items-center min-w-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-navy-600 shrink-0" />
-                        <span className="flex-1 border-t border-dashed border-gray-300 dark:border-navy-600 mx-1" />
-                        <Truck size={13} className="text-gray-300 dark:text-navy-600 shrink-0" />
-                        <span className="flex-1 border-t border-dashed border-gray-300 dark:border-navy-600 mx-1" />
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      </div>
-
-                      <div className="text-right w-[92px] shrink-0">
-                        <p className="text-[17px] font-black text-gray-900 dark:text-gray-100 tabular-nums leading-none">
-                          {job.delivery_at ? formatTime(job.delivery_at) : '—'}
-                        </p>
-                        <p className="text-[9.5px] text-gray-400 dark:text-navy-500 truncate mt-1">{splitAddress(job.consignee).name || '—'}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 mt-2.5 text-[9.5px] text-gray-400 dark:text-navy-500">
-                      <span>{job.package_qty ?? '—'} pkg · {job.weight_kg ?? '—'} kg</span>
-                      {job.direction && <span>{job.direction}</span>}
-                      {job.temperature_range && <span>{job.temperature_range}</span>}
-                      {job.declared_value != null && <span>{job.declared_value_currency ?? ''} {job.declared_value}</span>}
-                    </div>
-                  </div>
-                );
-              }
-
-              /* Design 2 — kanban-style ticket card with status stripe */
-              if (cardDesign === 2) {
-                const stripeColor = job.dangerous_goods
-                  ? 'bg-red-500'
-                  : job.direction === 'Outbound'
-                  ? 'bg-blue-500'
-                  : 'bg-emerald-500';
-                return (
-                  <div
-                    key={job.id}
-                    {...dragProps}
-                    className={`relative flex gap-3 pl-4 pr-3 py-3 rounded-xl border cursor-pointer transition-all overflow-hidden ${
-                      selected
-                        ? 'border-emerald-300 dark:border-emerald-700 shadow-md bg-white dark:bg-navy-800'
-                        : 'border-gray-100 dark:border-navy-800 hover:shadow-sm bg-gray-50/50 dark:bg-navy-900/40'
-                    }`}
-                  >
-                    <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${stripeColor}`} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono font-bold text-[12.5px] text-gray-900 dark:text-gray-100">{job.hawb_number}</span>
-                        <span className="text-[13px] font-black text-gray-900 dark:text-gray-100 shrink-0">
-                          {job.weight_kg ?? '—'} <span className="text-[9px] font-bold text-gray-400 dark:text-navy-500">kg</span>
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-gray-600 dark:text-navy-300 mt-1.5 leading-snug truncate">{splitAddress(job.shipper).name || '—'}</p>
-                      <p className="text-[9px] text-gray-300 dark:text-navy-600 leading-none my-0.5">↓</p>
-                      <p className="text-[11px] text-gray-600 dark:text-navy-300 leading-snug truncate">{splitAddress(job.consignee).name || '—'}</p>
-                      <div className="flex items-center gap-1.5 flex-wrap mt-2.5">
-                        {job.dangerous_goods_notes && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded-full">
-                            <TriangleAlert size={9} /> DG
-                          </span>
-                        )}
-                        {jobIdsWithUpdates.has(job.id) && (
-                          <span title="Pending update — see Job details" className="inline-flex items-center gap-1 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 px-1.5 py-0.5 rounded-full">
-                            <RefreshCw size={9} />
-                          </span>
-                        )}
-                        {pages && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-1.5 py-0.5 rounded-full">
-                            <FileText size={9} /> {pages}
-                          </span>
-                        )}
-                        {job.client_account && (
-                          <span className="text-[9px] font-bold text-gray-500 dark:text-navy-400 bg-gray-100 dark:bg-navy-800 px-1.5 py-0.5 rounded-full">{job.client_account}</span>
-                        )}
-                        <span className="ml-auto text-[10.5px] font-bold text-gray-700 dark:text-gray-200">
-                          {job.collection_at ? formatTime(job.collection_at) : '—'}
-                        </span>
-                        <ChevronRight size={13} className={selected ? 'text-emerald-500 shrink-0' : 'text-gray-300 dark:text-navy-600 shrink-0'} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-
-              /* Design 3 — dense spreadsheet-style table row */
-              if (cardDesign === 3) {
-                return (
-                  <div
-                    key={job.id}
-                    {...dragProps}
-                    className={`grid grid-cols-[24px_1fr_56px_56px_44px_50px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[11px] border-b border-gray-50 dark:border-navy-800/70 transition-colors ${
-                      selected ? 'bg-emerald-50/70 dark:bg-emerald-950/25' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
-                    }`}
-                  >
-                    <span className="text-gray-400 dark:text-navy-500 font-mono text-[10px]">{index + 1}</span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{job.hawb_number}</span>
-                        {job.dangerous_goods_notes && <TriangleAlert size={10} className="text-red-500 shrink-0" />}
-                        {jobIdsWithUpdates.has(job.id) && <RefreshCw size={10} className="text-orange-500 shrink-0" />}
-                        {pages && <FileText size={10} className="text-blue-500 shrink-0" />}
-                      </div>
-                      <p className="text-gray-400 dark:text-navy-500 truncate text-[10px] mt-0.5">{routeLine(job)}</p>
-                    </div>
-                    <span className="text-gray-600 dark:text-navy-300 text-right tabular-nums">{job.collection_at ? formatTime(job.collection_at) : '—'}</span>
-                    <span className="text-gray-400 dark:text-navy-500 text-right tabular-nums">{job.delivery_at ? formatTime(job.delivery_at) : '—'}</span>
-                    <span className="text-gray-400 dark:text-navy-500 text-right tabular-nums">{job.package_qty ?? '—'}</span>
-                    <span className="text-gray-400 dark:text-navy-500 text-right tabular-nums">{job.weight_kg ?? '—'}</span>
-                  </div>
-                );
-              }
-
-              /* Design 4 — badge row + label/value data grid */
-              if (cardDesign === 4) {
-                return (
-                  <div
-                    key={job.id}
-                    {...dragProps}
-                    className={`flex items-center gap-3 px-4 py-4 cursor-pointer transition-colors border-l-2 ${
-                      selected
-                        ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-500'
-                        : 'border-transparent hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
-                    }`}
-                  >
-                    {!locked && <GripVertical size={14} className="text-gray-300 dark:text-navy-600 cursor-grab shrink-0" />}
-                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-navy-800 dark:bg-navy-700 text-white text-[11px] font-bold shrink-0">
-                      {index + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[12px]">{job.hawb_number}</span>
-                        {job.client_account && (
-                          <span className="text-[9px] font-bold text-gray-500 dark:text-navy-400 bg-gray-100 dark:bg-navy-800 px-1.5 py-0.5 rounded-full">
-                            {job.client_account}
-                          </span>
-                        )}
-                        {pages && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-1.5 py-0.5 rounded-full">
-                            <FileText size={9} /> {pages}
-                          </span>
-                        )}
-                        {job.dangerous_goods_notes && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded-full">
-                            <TriangleAlert size={9} /> {job.dangerous_goods_notes}
-                          </span>
-                        )}
-                        {jobIdsWithUpdates.has(job.id) && (
-                          <span title="Pending update — see Job details" className="inline-flex items-center gap-1 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 px-1.5 py-0.5 rounded-full">
-                            <RefreshCw size={9} />
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10.5px] text-gray-400 dark:text-navy-500 truncate mt-0.5">{routeLine(job)}</p>
-                      <div className="grid grid-cols-4 gap-x-3 gap-y-2 mt-2.5 pt-2.5 border-t border-gray-100 dark:border-navy-800/70">
-                        {[
-                          { label: 'Collection', value: job.collection_at ? formatTime(job.collection_at) : '—' },
-                          { label: 'Delivery', value: job.delivery_at ? formatTime(job.delivery_at) : '—' },
-                          { label: 'Packages', value: job.package_qty ?? '—' },
-                          { label: 'Weight', value: job.weight_kg != null ? `${job.weight_kg} kg` : '—' },
-                          { label: 'Direction', value: job.direction ?? '—' },
-                          { label: 'Handling', value: job.temperature_range ?? '—' },
-                          { label: 'Dimensions', value: job.dimensions ? `${job.dimensions} cm` : '—' },
-                          { label: 'Value', value: job.declared_value != null ? `${job.declared_value_currency ?? ''} ${job.declared_value}` : '—' },
-                        ].map(cell => (
-                          <div key={cell.label} className="min-w-0">
-                            <p className="text-[8.5px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide">{cell.label}</p>
-                            <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 truncate">{cell.value}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <ChevronRight size={14} className={selected ? 'text-emerald-500 shrink-0' : 'text-gray-300 dark:text-navy-600 shrink-0'} />
-                  </div>
-                );
-              }
-
-              /* Design 5 — badge row + inline icon-tag meta strip */
               return (
                 <div
                   key={job.id}
                   {...dragProps}
-                  className={`flex items-center gap-3 px-4 py-4 cursor-pointer transition-colors border-l-2 ${
-                    selected
-                      ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-500'
-                      : 'border-transparent hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
+                  className={`grid grid-cols-[24px_1fr_56px_56px_44px_50px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[11px] border-b border-gray-50 dark:border-navy-800/70 transition-colors ${
+                    selected ? 'bg-emerald-50/70 dark:bg-emerald-950/25' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
                   }`}
                 >
-                  {!locked && <GripVertical size={14} className="text-gray-300 dark:text-navy-600 cursor-grab shrink-0" />}
-                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-navy-800 dark:bg-navy-700 text-white text-[11px] font-bold shrink-0">
-                    {index + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[12px]">{job.hawb_number}</span>
-                      {job.client_account && (
-                        <span className="text-[9px] font-bold text-gray-500 dark:text-navy-400 bg-gray-100 dark:bg-navy-800 px-1.5 py-0.5 rounded-full">
-                          {job.client_account}
-                        </span>
-                      )}
-                      {pages && (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-1.5 py-0.5 rounded-full">
-                          <FileText size={9} /> {pages}
-                        </span>
-                      )}
-                      {job.dangerous_goods_notes && (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded-full">
-                          <TriangleAlert size={9} /> {job.dangerous_goods_notes}
-                        </span>
-                      )}
-                      {jobIdsWithUpdates.has(job.id) && (
-                        <span title="Pending update — see Job details" className="inline-flex items-center gap-1 text-[9px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 px-1.5 py-0.5 rounded-full">
-                          <RefreshCw size={9} />
-                        </span>
-                      )}
+                  <span className="text-gray-400 dark:text-navy-500 font-mono text-[10px]">{index + 1}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{job.hawb_number}</span>
+                      {job.dangerous_goods_notes && <TriangleAlert size={10} className="text-red-500 shrink-0" />}
+                      {jobIdsWithUpdates.has(job.id) && <RefreshCw size={10} className="text-orange-500 shrink-0" />}
+                      {pages && <FileText size={10} className="text-blue-500 shrink-0" />}
                     </div>
-                    <p className="text-[10.5px] text-gray-400 dark:text-navy-500 truncate mt-0.5">{routeLine(job)}</p>
-                    <div className="flex items-center gap-x-3 gap-y-1 flex-wrap mt-1.5 text-[10px] font-medium text-gray-500 dark:text-navy-400">
-                      <span className="flex items-center gap-1">
-                        <Clock size={10} /> {job.collection_at ? formatTime(job.collection_at) : '—'} → {job.delivery_at ? formatTime(job.delivery_at) : '—'}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <PackageIcon size={10} /> {job.package_qty ?? '—'} · {job.weight_kg ?? '—'} kg
-                      </span>
-                      {job.direction && (
-                        <span className="flex items-center gap-1"><ArrowLeftRight size={10} /> {job.direction}</span>
-                      )}
-                      {job.temperature_range && (
-                        <span className="flex items-center gap-1"><Thermometer size={10} /> {job.temperature_range}</span>
-                      )}
-                      {job.dimensions && (
-                        <span className="flex items-center gap-1"><Ruler size={10} /> {job.dimensions} cm</span>
-                      )}
-                      {job.declared_value != null && (
-                        <span className="flex items-center gap-1"><Banknote size={10} /> {job.declared_value_currency ?? ''} {job.declared_value}</span>
-                      )}
-                    </div>
+                    <p className="text-gray-400 dark:text-navy-500 truncate text-[10px] mt-0.5">{routeLine(job)}</p>
                   </div>
-                  <ChevronRight size={14} className={selected ? 'text-emerald-500 shrink-0' : 'text-gray-300 dark:text-navy-600 shrink-0'} />
+                  <span className="text-gray-600 dark:text-navy-300 text-right tabular-nums">{job.collection_at ? formatTime(job.collection_at) : '—'}</span>
+                  <span className="text-gray-400 dark:text-navy-500 text-right tabular-nums">{job.delivery_at ? formatTime(job.delivery_at) : '—'}</span>
+                  <span className="text-gray-400 dark:text-navy-500 text-right tabular-nums">{job.package_qty ?? '—'}</span>
+                  <span className="text-gray-400 dark:text-navy-500 text-right tabular-nums">{job.weight_kg ?? '—'}</span>
                 </div>
               );
             })}
           </div>
 
           <div className="flex items-center justify-end gap-3 px-4 py-3 border-t border-gray-100 dark:border-navy-800">
-            {exportError && (
-              <span className="text-[11px] font-semibold text-red-600 dark:text-red-400">{exportError}</span>
-            )}
-
-            {manifest.status === 'open' && (
-              <button
-                onClick={handleExport}
-                disabled={exporting}
-                className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-navy-900 dark:bg-navy-700 hover:bg-navy-800 dark:hover:bg-navy-600 disabled:opacity-60 px-4 py-2 rounded-lg transition-colors"
-              >
-                <Download size={13} /> {exporting ? 'Exporting…' : 'Export manifest'}
-              </button>
-            )}
-
             {(manifest.status === 'booked' || manifest.status === 'on_hold') && (
               <>
                 <button

@@ -38,16 +38,27 @@ export default function Tooltip({
 
   // Clamp to the viewport after the tooltip renders — near a screen edge, the
   // centered/anchored position from show() can push part of it off-screen.
+  // Uses a single min/max clamp per axis (not competing if/else branches) so
+  // it always converges to one deterministic position, even when the tooltip
+  // is wider/taller than the available space — two independent "shift left"
+  // vs "shift right" checks can otherwise undo each other forever and blow
+  // React's update-depth limit.
   useLayoutEffect(() => {
     if (!open || !coords || !tooltipRef.current) return;
     const rect = tooltipRef.current.getBoundingClientRect();
     const margin = 12;
-    let { top, left } = coords;
-    if (rect.left < margin) left += margin - rect.left;
-    else if (rect.right > window.innerWidth - margin) left -= rect.right - (window.innerWidth - margin);
-    if (rect.top < margin) top += margin - rect.top;
-    else if (rect.bottom > window.innerHeight - margin) top -= rect.bottom - (window.innerHeight - margin);
-    if (top !== coords.top || left !== coords.left) setCoords({ top, left });
+
+    const maxLeft = Math.max(margin, window.innerWidth - rect.width - margin);
+    const maxTop = Math.max(margin, window.innerHeight - rect.height - margin);
+    const clampedRectLeft = Math.min(Math.max(rect.left, margin), maxLeft);
+    const clampedRectTop = Math.min(Math.max(rect.top, margin), maxTop);
+
+    const deltaLeft = clampedRectLeft - rect.left;
+    const deltaTop = clampedRectTop - rect.top;
+
+    if (Math.abs(deltaLeft) > 0.5 || Math.abs(deltaTop) > 0.5) {
+      setCoords(c => (c ? { top: c.top + deltaTop, left: c.left + deltaLeft } : c));
+    }
   }, [open, coords]);
 
   if (!content) return <>{children}</>;

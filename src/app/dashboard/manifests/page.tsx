@@ -1,22 +1,36 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ChevronRight, Package, Weight, CalendarDays, User, MapPin, CheckCircle2, Clock3, Hash, Tag, RefreshCw } from 'lucide-react';
+import { ChevronRight, Package, CalendarDays, RefreshCw, CaseSensitive, CircleDot, Hash, User, File } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
-import { useGetHawbManifestsQuery, useGetJobUpdatesQuery, type HawbManifest } from '@/services/hawbApi';
+import { useGetHawbManifestsQuery, useGetJobUpdatesQuery } from '@/services/hawbApi';
 import { useManifestsLiveRefresh } from '@/hooks/useManifestsLiveRefresh';
 import ApiErrorState from '@/components/ApiErrorState';
 
 const STATUS_BADGE: Record<string, string> = {
-  pending_review: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/60',
-  open: 'bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-navy-300 ring-1 ring-gray-200 dark:ring-navy-700',
-  booked: 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-800/60',
-  confirmed: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800/60',
-  on_hold: 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 ring-1 ring-red-200 dark:ring-red-800/60',
-  exported: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800/60',
+  pending_review: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+  open: 'bg-slate-200 dark:bg-navy-700 text-slate-700 dark:text-navy-200',
+  booked: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+  confirmed: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+  on_hold: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+  exported: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
 };
+
+const TAG_COLORS = [
+  'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300',
+  'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+  'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+  'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+  'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
+  'bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-300',
+];
+
+function tagColor(label: string): string {
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) >>> 0;
+  return TAG_COLORS[hash % TAG_COLORS.length];
+}
 
 const STATUS_LABEL: Record<string, string> = {
   pending_review: 'Pending Review',
@@ -27,14 +41,14 @@ const STATUS_LABEL: Record<string, string> = {
   exported: 'Exported',
 };
 
-function BlindBadge({ sourceKind, className = '' }: { sourceKind: HawbManifest['source_kind']; className?: string }) {
-  if (sourceKind !== 'blind') return null;
-  return (
-    <span className={`inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-800/60 ${className}`}>
-      Blind
-    </span>
-  );
-}
+const TABLE_COLUMNS = [
+  { label: 'Reference', icon: CaseSensitive },
+  { label: 'Status', icon: CircleDot },
+  { label: 'Jobs', icon: Hash },
+  { label: 'Total Weight (kg)', icon: Hash },
+  { label: 'Operator', icon: User },
+  { label: 'Created', icon: CalendarDays },
+];
 
 function PendingUpdateBadge({ count, className = '' }: { count: number; className?: string }) {
   if (!count) return null;
@@ -48,10 +62,6 @@ function PendingUpdateBadge({ count, className = '' }: { count: number; classNam
   );
 }
 
-function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
 function formatDateTime(value: string): string {
   const d = new Date(value);
   const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -59,19 +69,9 @@ function formatDateTime(value: string): string {
   return `${date} ${time}`;
 }
 
-function initials(name: string | null): string {
-  if (!name) return 'SY';
-  return name.split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2);
-}
-
-function routeLabel(m: HawbManifest): string {
-  return `${m.start_point || '—'} → ${m.end_point || '—'}`;
-}
-
 export default function ManifestsPage() {
   const { data: manifests = [], isLoading, isError, refetch } = useGetHawbManifestsQuery();
   const { data: jobUpdates = [] } = useGetJobUpdatesQuery();
-  const [layout, setLayout] = useState<1 | 2 | 3>(1);
   useManifestsLiveRefresh();
 
   const pendingUpdateCounts = new Map<string, number>();
@@ -83,26 +83,15 @@ export default function ManifestsPage() {
 
   return (
     <motion.div variants={pageTransition} initial="hidden" animate="visible" className="space-y-4">
-      <motion.div variants={staggerItem} className="flex items-center justify-between gap-3">
+      <motion.div variants={staggerItem} className="flex items-start gap-2.5">
+        <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mt-0.5">
+          <Package size={16} strokeWidth={2} />
+        </span>
         <div>
           <h1 className="text-base font-black text-gray-900 dark:text-gray-100 leading-tight">Manifests</h1>
-          <p className="text-[11px] text-gray-400 dark:text-navy-500 mt-0.5">{manifests.length} manifests</p>
-        </div>
-        <div className="flex items-center gap-0.5 bg-gray-50 dark:bg-navy-800 rounded-lg p-0.5 shrink-0">
-          {([1, 2, 3] as const).map(n => (
-            <button
-              key={n}
-              onClick={() => setLayout(n)}
-              title={`Layout ${n}`}
-              className={`w-6 h-6 flex items-center justify-center text-[10px] font-bold rounded-md transition-colors ${
-                layout === n
-                  ? 'bg-white dark:bg-navy-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                  : 'text-gray-400 dark:text-navy-500 hover:text-gray-600 dark:hover:text-navy-300'
-              }`}
-            >
-              {n}
-            </button>
-          ))}
+          <p className="text-[11px] text-gray-400 dark:text-navy-500 mt-0.5">
+            {manifests.length} manifest{manifests.length === 1 ? '' : 's'} — track jobs, weight, and export status in one place
+          </p>
         </div>
       </motion.div>
 
@@ -118,156 +107,64 @@ export default function ManifestsPage() {
         <div className="flex items-center justify-center h-48 text-gray-300 dark:text-navy-600 text-sm bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800">
           No manifests yet
         </div>
-      ) : layout === 1 ? (
-        /* Layout 1 — enhanced data table */
-        <motion.div variants={staggerItem} className="bg-white dark:bg-navy-900 rounded-2xl overflow-hidden">
+      ) : (
+        <motion.div variants={staggerItem} className="bg-white dark:bg-navy-900">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b-2 border-gray-200 dark:border-navy-700">
-                  {[
-                    { label: 'Reference', icon: Hash },
-                    { label: 'Status', icon: Tag },
-                    { label: 'Jobs', icon: Package },
-                    { label: 'Total Weight (kg)', icon: Weight },
-                    { label: 'Operator', icon: User },
-                    { label: 'Created', icon: CalendarDays },
-                  ].map(h => (
-                    <th key={h.label} className="px-4 py-3 text-[10px] font-bold text-gray-500 dark:text-navy-400 uppercase tracking-wider whitespace-nowrap">
-                      <span className="flex items-center gap-2">
-                        <h.icon size={15} className="text-gray-400 dark:text-navy-500" />
-                        {h.label}
+                <tr className="border-b border-gray-200 dark:border-navy-700">
+                  {TABLE_COLUMNS.map(({ label, icon: Icon }, i) => (
+                    <th
+                      key={label}
+                      className={`px-4 pb-2.5 text-[12px] font-medium text-gray-500 dark:text-navy-400 whitespace-nowrap ${i < TABLE_COLUMNS.length - 1 ? 'border-r border-gray-200 dark:border-navy-700' : ''}`}
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <Icon size={13} strokeWidth={1.8} className="text-gray-400 dark:text-navy-500" />
+                        {label}
                       </span>
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-navy-700">
-                {manifests.map(m => (
-                  <tr key={m.id} className="hover:bg-gray-50/70 dark:hover:bg-navy-800/50 transition-colors">
-                    <td className="px-4 py-4 whitespace-nowrap">
+              <tbody>
+                {manifests.map((m) => (
+                  <tr
+                    key={m.id}
+                    className="group border-b border-gray-200 dark:border-navy-700 hover:border-emerald-300 dark:hover:border-emerald-700/50 hover:bg-gray-50/60 dark:hover:bg-navy-800/30 transition-colors"
+                  >
+                    <td className="px-4 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1.5">
-                        <Link href={`/dashboard/manifests/${m.id}`} className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[12px] hover:underline">
+                        <File size={13} strokeWidth={1.8} className="text-gray-300 dark:text-navy-600 shrink-0" />
+                        <Link href={`/dashboard/manifests/${m.id}`} className="font-mono font-semibold text-gray-900 dark:text-gray-100 text-[12.5px] hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
                           {m.reference_number}
                         </Link>
                         <PendingUpdateBadge count={pendingUpdateCounts.get(m.id) ?? 0} />
                       </span>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center text-[9.5px] font-bold px-2 py-0.5 rounded-full ${STATUS_BADGE[m.status]}`}>
+                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap">
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${STATUS_BADGE[m.status]}`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
                         {STATUS_LABEL[m.status]}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-[12px] font-semibold text-gray-800 dark:text-navy-200">{m.job_count}</td>
-                    <td className="px-4 py-4 text-[12px] font-semibold text-gray-800 dark:text-navy-200">{m.total_weight_kg}</td>
-                    <td className="px-4 py-4 text-[11.5px] font-medium text-gray-700 dark:text-navy-300 whitespace-nowrap">{m.created_by_name ?? 'System'}</td>
-                    <td className="px-4 py-4 text-[11px] font-medium text-gray-600 dark:text-navy-400 whitespace-nowrap">{formatDateTime(m.created_at)}</td>
+                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] font-medium text-gray-700 dark:text-navy-200">{m.job_count}</td>
+                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] font-medium text-gray-700 dark:text-navy-200">{m.total_weight_kg}</td>
+                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap">
+                      <span className={`inline-flex items-center text-[11px] font-medium px-2.5 py-1 rounded-full ${tagColor(m.created_by_name ?? 'System')}`}>
+                        {m.created_by_name ?? 'System'}
+                      </span>
+                    </td>
+                    <td className="pl-2 pr-4 py-2 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-[11px] text-gray-500 dark:text-navy-400">{formatDateTime(m.created_at)}</span>
+                        <ChevronRight size={13} className="ml-1 text-gray-300 dark:text-navy-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </motion.div>
-      ) : layout === 2 ? (
-        /* Layout 2 — card grid */
-        <motion.div variants={staggerItem} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {manifests.map(m => (
-            <Link
-              key={m.id}
-              href={`/dashboard/manifests/${m.id}`}
-              className="block bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm p-4 hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-800/60 transition-all"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 min-w-0">
-                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[13px] truncate">{m.reference_number}</span>
-                  <PendingUpdateBadge count={pendingUpdateCounts.get(m.id) ?? 0} />
-                </span>
-                <span className="inline-flex items-center gap-1.5 shrink-0">
-                  <BlindBadge sourceKind={m.source_kind} />
-                  <span className={`inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-full ${STATUS_BADGE[m.status]}`}>
-                    {STATUS_LABEL[m.status]}
-                  </span>
-                </span>
-              </div>
-
-              <p className="flex items-center gap-1 text-[10.5px] text-gray-400 dark:text-navy-500 mt-2.5">
-                <MapPin size={11} className="shrink-0" />
-                <span className="truncate">{routeLabel(m)}</span>
-              </p>
-
-              <div className="grid grid-cols-3 gap-2 mt-3.5 pt-3.5 border-t border-gray-100 dark:border-navy-800">
-                <div>
-                  <p className="text-[8.5px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide flex items-center gap-1"><Package size={9} /> Jobs</p>
-                  <p className="text-[12px] font-black text-gray-800 dark:text-gray-100 mt-0.5">{m.job_count}</p>
-                </div>
-                <div>
-                  <p className="text-[8.5px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide flex items-center gap-1"><Weight size={9} /> Weight</p>
-                  <p className="text-[12px] font-black text-gray-800 dark:text-gray-100 mt-0.5">{m.total_weight_kg} kg</p>
-                </div>
-                <div>
-                  <p className="text-[8.5px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide flex items-center gap-1"><CalendarDays size={9} /> Created</p>
-                  <p className="text-[12px] font-black text-gray-800 dark:text-gray-100 mt-0.5">{formatDate(m.created_at)}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 mt-3.5 text-[10px] text-gray-400 dark:text-navy-500">
-                <span className="w-[18px] h-[18px] rounded-full bg-navy-800 dark:bg-navy-700 text-white flex items-center justify-center text-[8px] font-bold shrink-0">
-                  {initials(m.created_by_name)}
-                </span>
-                <span className="truncate">{m.created_by_name ?? 'System'}</span>
-                {m.exported_at && (
-                  <span className="ml-auto inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 shrink-0">
-                    <CheckCircle2 size={11} /> {formatDate(m.exported_at)}
-                  </span>
-                )}
-              </div>
-            </Link>
-          ))}
-        </motion.div>
-      ) : (
-        /* Layout 3 — status-striped list rows */
-        <motion.div variants={staggerItem} className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm overflow-hidden divide-y divide-gray-100 dark:divide-navy-800">
-          {manifests.map(m => (
-            <Link
-              key={m.id}
-              href={`/dashboard/manifests/${m.id}`}
-              className="group relative flex items-center gap-4 pl-5 pr-4 py-3.5 hover:bg-gray-50/70 dark:hover:bg-navy-800/50 transition-colors"
-            >
-              <span className={`absolute left-0 top-2 bottom-2 w-1 rounded-full ${m.status === 'exported' ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-navy-600'}`} />
-
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[12.5px] shrink-0">{m.reference_number}</span>
-                  <span className={`inline-flex items-center text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${STATUS_BADGE[m.status]}`}>
-                    {STATUS_LABEL[m.status]}
-                  </span>
-                  <BlindBadge sourceKind={m.source_kind} />
-                  <PendingUpdateBadge count={pendingUpdateCounts.get(m.id) ?? 0} />
-                </div>
-                <div className="flex items-center gap-1 mt-1 min-w-0">
-                  <MapPin size={10} className="text-gray-300 dark:text-navy-600 shrink-0" />
-                  <span className="text-[10.5px] text-gray-400 dark:text-navy-500 truncate">{routeLabel(m)}</span>
-                </div>
-              </div>
-
-              <div className="hidden sm:grid grid-cols-[44px_72px_130px_92px] items-center gap-0 shrink-0 pl-5 ml-1 border-l border-gray-100 dark:border-navy-800 text-[11px] text-gray-600 dark:text-navy-300">
-                <span className="flex items-center gap-1.5"><Package size={12} className="text-gray-300 dark:text-navy-600" /> {m.job_count}</span>
-                <span className="flex items-center gap-1.5"><Weight size={12} className="text-gray-300 dark:text-navy-600" /> {m.total_weight_kg}kg</span>
-                <span className="flex items-center gap-1.5 min-w-0 pr-2">
-                  <span className="w-4 h-4 rounded-full bg-navy-800 dark:bg-navy-700 text-white flex items-center justify-center text-[7px] font-bold shrink-0">
-                    {initials(m.created_by_name)}
-                  </span>
-                  <span className="truncate">{m.created_by_name ?? 'System'}</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  {m.status === 'exported' ? <CheckCircle2 size={12} className="text-emerald-500 shrink-0" /> : <Clock3 size={12} className="text-gray-300 dark:text-navy-600 shrink-0" />}
-                  {m.status === 'exported' && m.exported_at ? formatDate(m.exported_at) : formatDate(m.created_at)}
-                </span>
-              </div>
-
-              <ChevronRight size={14} className="text-gray-300 dark:text-navy-600 shrink-0 transition-colors group-hover:text-emerald-500" />
-            </Link>
-          ))}
         </motion.div>
       )}
     </motion.div>
