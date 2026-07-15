@@ -247,6 +247,7 @@ export default function ManifestDetailPage() {
   const [syncedFormFor, setSyncedFormFor] = useState<string | null>(null);
   const [points, setPoints] = useState({ start_point: '', end_point: '' });
   const [syncedPointsFor, setSyncedPointsFor] = useState<string | undefined>(undefined);
+  const [activeDocId, setActiveDocId] = useState<string | null>(null);
 
   // Auto-apply pending blind-companion/duplicate merges as soon as they're seen —
   // no manual "Apply" click needed. Already-exported (locked) jobs are the one
@@ -279,6 +280,7 @@ export default function ManifestDetailPage() {
     if (manifest && syncedPointsFor !== manifest.id) {
       setSyncedPointsFor(manifest.id);
       setPoints({ start_point: manifest.start_point ?? '', end_point: manifest.end_point ?? '' });
+      setActiveDocId(null);
     }
   }, [manifest, syncedPointsFor]);
 
@@ -311,6 +313,9 @@ export default function ManifestDetailPage() {
   const dgCount = orderedJobs.filter(j => j.dangerous_goods).length;
   const packageCount = orderedJobs.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
   const jobIdsWithUpdates = new Set(jobUpdates.map(u => u.job_id));
+  const multiDocument = manifest.documents.length > 1;
+  const visibleJobs = activeDocId ? orderedJobs.filter(j => j.document_id === activeDocId) : orderedJobs;
+  const dragDisabled = locked || activeDocId !== null;
 
   // Start/end point pickers offer the collection & delivery addresses already present on
   // this manifest's run, so choosing a start point can auto-fill its matching end point.
@@ -465,7 +470,7 @@ export default function ManifestDetailPage() {
               )}
             </div>
             <p className="text-[11.5px] text-gray-400 dark:text-navy-500 mt-1">
-              {manifest.document.filename}
+              {multiDocument ? `${manifest.documents.length} source files` : manifest.documents[0].filename}
               <span className="mx-1.5 text-gray-200 dark:text-navy-700">·</span>
               Created {formatDate(manifest.created_at)}
               <span className="mx-1.5 text-gray-200 dark:text-navy-700">·</span>
@@ -493,18 +498,72 @@ export default function ManifestDetailPage() {
               {exporting ? 'Exporting…' : 'Export manifest'}
             </button>
           )}
-          <button
-            onClick={() => window.open(manifest.pdf_url, '_blank', 'noopener,noreferrer')}
-            title="View full PDF in a new tab"
-            className="flex items-center gap-1.5 text-[11.5px] font-semibold text-gray-600 dark:text-navy-300 bg-white dark:bg-navy-900 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-800 hover:text-gray-800 dark:hover:text-navy-100 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
-          >
-            <span className="flex items-center justify-center w-4 h-4 rounded bg-gray-100 dark:bg-navy-800">
-              <FileText size={11} strokeWidth={2.25} />
-            </span>
-            View PDF
-          </button>
+          {!multiDocument && (
+            <button
+              onClick={() => window.open(manifest.documents[0].pdf_url, '_blank', 'noopener,noreferrer')}
+              title="View full PDF in a new tab"
+              className="flex items-center gap-1.5 text-[11.5px] font-semibold text-gray-600 dark:text-navy-300 bg-white dark:bg-navy-900 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-800 hover:text-gray-800 dark:hover:text-navy-100 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
+            >
+              <span className="flex items-center justify-center w-4 h-4 rounded bg-gray-100 dark:bg-navy-800">
+                <FileText size={11} strokeWidth={2.25} />
+              </span>
+              View PDF
+            </button>
+          )}
         </div>
       </motion.div>
+
+      {multiDocument && (
+        <motion.div variants={staggerItem} className="flex items-center gap-1.5 flex-wrap bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-2 py-2">
+          <button
+            onClick={() => setActiveDocId(null)}
+            className={`flex items-center gap-1.5 text-[11.5px] font-semibold px-2.5 py-1 rounded-lg transition-colors ${
+              activeDocId === null
+                ? 'bg-emerald-50 dark:bg-emerald-950/25 text-emerald-700 dark:text-emerald-400'
+                : 'text-gray-500 dark:text-navy-400 hover:bg-gray-50 dark:hover:bg-navy-800'
+            }`}
+          >
+            All Jobs
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-navy-800 text-gray-500 dark:text-navy-400">
+              {orderedJobs.length}
+            </span>
+          </button>
+          {manifest.documents.map(doc => {
+            const docJobCount = orderedJobs.filter(j => j.document_id === doc.id).length;
+            const active = activeDocId === doc.id;
+            return (
+              <button
+                key={doc.id}
+                onClick={() => setActiveDocId(doc.id)}
+                title={doc.filename}
+                className={`flex items-center gap-1.5 text-[11.5px] font-semibold px-2.5 py-1 rounded-lg transition-colors ${
+                  active
+                    ? 'bg-emerald-50 dark:bg-emerald-950/25 text-emerald-700 dark:text-emerald-400'
+                    : 'text-gray-500 dark:text-navy-400 hover:bg-gray-50 dark:hover:bg-navy-800'
+                }`}
+              >
+                <FileText size={11} strokeWidth={2.25} className="shrink-0" />
+                <span className="max-w-[140px] truncate">{doc.filename}</span>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  active ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-gray-100 dark:bg-navy-800'
+                }`}>
+                  {docJobCount}
+                </span>
+              </button>
+            );
+          })}
+          {activeDocId && (
+            <button
+              onClick={() => window.open(manifest.documents.find(d => d.id === activeDocId)!.pdf_url, '_blank', 'noopener,noreferrer')}
+              title="View this PDF in a new tab"
+              className="flex items-center gap-1.5 text-[11.5px] font-semibold text-gray-600 dark:text-navy-300 bg-gray-50 dark:bg-navy-800 hover:bg-gray-100 dark:hover:bg-navy-700 px-2.5 py-1 rounded-lg transition-colors ml-auto"
+            >
+              <ExternalLink size={11} strokeWidth={2.25} />
+              View PDF
+            </button>
+          )}
+        </motion.div>
+      )}
 
       <motion.div variants={staggerItem} className="grid grid-cols-4 gap-3">
         {[
@@ -977,7 +1036,11 @@ export default function ManifestDetailPage() {
             <div>
               <h2 className="text-[12px] font-bold text-gray-700 dark:text-navy-200">Run order</h2>
               <p className="text-[10.5px] text-gray-400 dark:text-navy-500">
-                {locked ? 'Manifest is exported and locked' : 'Drag to reorder — click a row to view its details'}
+                {locked
+                  ? 'Manifest is exported and locked'
+                  : activeDocId
+                    ? 'Filtered to one source document — click a row to view its details'
+                    : 'Drag to reorder — click a row to view its details'}
               </p>
             </div>
           </div>
@@ -991,11 +1054,11 @@ export default function ManifestDetailPage() {
               <span className="text-right">Pkg</span>
               <span className="text-right">Wt (kg)</span>
             </div>
-            {orderedJobs.map((job, index) => {
+            {visibleJobs.map((job, index) => {
               const selected = selectedJobId === job.id;
               const pages = pageRangeLabel(job);
               const dragProps = {
-                draggable: !locked,
+                draggable: !dragDisabled,
                 onDragStart: () => setDragIndex(index),
                 onDragOver: (e: React.DragEvent) => { e.preventDefault(); handleDragOver(index); },
                 onDrop: handleDrop,

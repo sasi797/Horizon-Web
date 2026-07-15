@@ -115,8 +115,7 @@ export interface HawbManifestUpdate {
 
 export interface HawbManifestDetail extends HawbManifest {
   jobs: HawbJob[];
-  document: HawbDocument;
-  pdf_url: string;
+  documents: (HawbDocument & { pdf_url: string })[];
 }
 
 export interface HawbJobPendingUpdate {
