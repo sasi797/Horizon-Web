@@ -20,6 +20,15 @@ const OFFSET: Record<Side, { x: number; y: number }> = {
   right: { x: 8, y: 0 },
 };
 
+// Arrow sits on the edge of the tooltip facing the anchor — opposite the side
+// the tooltip is placed on (a "top" tooltip's arrow points down, etc).
+const ARROW_POSITION: Record<Side, string> = {
+  top: 'bottom-[-4px] left-1/2 -translate-x-1/2',
+  bottom: 'top-[-4px] left-1/2 -translate-x-1/2',
+  left: 'right-[-4px] top-1/2 -translate-y-1/2',
+  right: 'left-[-4px] top-1/2 -translate-y-1/2',
+};
+
 export default function Tooltip({
   content,
   children,
@@ -100,6 +109,10 @@ export default function Tooltip({
               className="z-[100] pointer-events-none max-w-[260px] px-2.5 py-1.5 rounded-lg bg-gray-900/95 dark:bg-navy-800/95 backdrop-blur-sm text-white text-[11px] font-semibold leading-snug shadow-lg ring-1 ring-black/5 dark:ring-white/10 whitespace-normal break-words"
             >
               {content}
+              <span
+                aria-hidden
+                className={`absolute w-2 h-2 rotate-45 bg-gray-900/95 dark:bg-navy-800/95 ${ARROW_POSITION[side]}`}
+              />
             </motion.span>
           )}
         </AnimatePresence>,

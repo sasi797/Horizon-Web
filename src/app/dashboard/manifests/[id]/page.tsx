@@ -499,16 +499,17 @@ export default function ManifestDetailPage() {
             </button>
           )}
           {!multiDocument && (
-            <button
-              onClick={() => window.open(manifest.documents[0].pdf_url, '_blank', 'noopener,noreferrer')}
-              title="View full PDF in a new tab"
-              className="flex items-center gap-1.5 text-[11.5px] font-semibold text-gray-600 dark:text-navy-300 bg-white dark:bg-navy-900 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-800 hover:text-gray-800 dark:hover:text-navy-100 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
-            >
-              <span className="flex items-center justify-center w-4 h-4 rounded bg-gray-100 dark:bg-navy-800">
-                <FileText size={11} strokeWidth={2.25} />
-              </span>
-              View PDF
-            </button>
+            <Tooltip content="View full PDF in a new tab" side="bottom">
+              <button
+                onClick={() => window.open(manifest.documents[0].pdf_url, '_blank', 'noopener,noreferrer')}
+                className="flex items-center gap-1.5 text-[11.5px] font-semibold text-gray-600 dark:text-navy-300 bg-white dark:bg-navy-900 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-800 hover:text-gray-800 dark:hover:text-navy-100 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
+              >
+                <span className="flex items-center justify-center w-4 h-4 rounded bg-gray-100 dark:bg-navy-800">
+                  <FileText size={11} strokeWidth={2.25} />
+                </span>
+                View PDF
+              </button>
+            </Tooltip>
           )}
         </div>
       </motion.div>
@@ -532,35 +533,36 @@ export default function ManifestDetailPage() {
             const docJobCount = orderedJobs.filter(j => j.document_id === doc.id).length;
             const active = activeDocId === doc.id;
             return (
-              <button
-                key={doc.id}
-                onClick={() => setActiveDocId(doc.id)}
-                title={doc.filename}
-                className={`flex items-center gap-1.5 text-[11.5px] font-semibold px-2.5 py-1 rounded-lg transition-colors ${
-                  active
-                    ? 'bg-emerald-50 dark:bg-emerald-950/25 text-emerald-700 dark:text-emerald-400'
-                    : 'text-gray-500 dark:text-navy-400 hover:bg-gray-50 dark:hover:bg-navy-800'
-                }`}
-              >
-                <FileText size={11} strokeWidth={2.25} className="shrink-0" />
-                <span className="max-w-[140px] truncate">{doc.filename}</span>
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  active ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-gray-100 dark:bg-navy-800'
-                }`}>
-                  {docJobCount}
-                </span>
-              </button>
+              <Tooltip key={doc.id} content={doc.filename} side="bottom">
+                <button
+                  onClick={() => setActiveDocId(doc.id)}
+                  className={`flex items-center gap-1.5 text-[11.5px] font-semibold px-2.5 py-1 rounded-lg transition-colors ${
+                    active
+                      ? 'bg-emerald-50 dark:bg-emerald-950/25 text-emerald-700 dark:text-emerald-400'
+                      : 'text-gray-500 dark:text-navy-400 hover:bg-gray-50 dark:hover:bg-navy-800'
+                  }`}
+                >
+                  <FileText size={11} strokeWidth={2.25} className="shrink-0" />
+                  <span className="max-w-[140px] truncate">{doc.filename}</span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                    active ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-gray-100 dark:bg-navy-800'
+                  }`}>
+                    {docJobCount}
+                  </span>
+                </button>
+              </Tooltip>
             );
           })}
           {activeDocId && (
-            <button
-              onClick={() => window.open(manifest.documents.find(d => d.id === activeDocId)!.pdf_url, '_blank', 'noopener,noreferrer')}
-              title="View this PDF in a new tab"
-              className="flex items-center gap-1.5 text-[11.5px] font-semibold text-gray-600 dark:text-navy-300 bg-gray-50 dark:bg-navy-800 hover:bg-gray-100 dark:hover:bg-navy-700 px-2.5 py-1 rounded-lg transition-colors ml-auto"
-            >
-              <ExternalLink size={11} strokeWidth={2.25} />
-              View PDF
-            </button>
+            <Tooltip content="View this PDF in a new tab" side="bottom" className="inline-flex ml-auto">
+              <button
+                onClick={() => window.open(manifest.documents.find(d => d.id === activeDocId)!.pdf_url, '_blank', 'noopener,noreferrer')}
+                className="flex items-center gap-1.5 text-[11.5px] font-semibold text-gray-600 dark:text-navy-300 bg-gray-50 dark:bg-navy-800 hover:bg-gray-100 dark:hover:bg-navy-700 px-2.5 py-1 rounded-lg transition-colors"
+              >
+                <ExternalLink size={11} strokeWidth={2.25} />
+                View PDF
+              </button>
+            </Tooltip>
           )}
         </motion.div>
       )}
@@ -632,13 +634,14 @@ export default function ManifestDetailPage() {
                 </span>
               )}
               {selectedJob?.blind_pdf_url && (
-                <button
-                  onClick={() => window.open(selectedJob.blind_pdf_url!, '_blank', 'noopener,noreferrer')}
-                  title="View the companion MF-PCS PDF used to fill in redacted fields"
-                  className="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-full hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors"
-                >
-                  <ExternalLink size={11} /> MF-PCS View PDF
-                </button>
+                <Tooltip content="View the companion MF-PCS PDF used to fill in redacted fields" side="bottom">
+                  <button
+                    onClick={() => window.open(selectedJob.blind_pdf_url!, '_blank', 'noopener,noreferrer')}
+                    className="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-full hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors"
+                  >
+                    <ExternalLink size={11} /> MF-PCS View PDF
+                  </button>
+                </Tooltip>
               )}
             </div>
           </div>
@@ -667,15 +670,16 @@ export default function ManifestDetailPage() {
                         <p className="text-[10px] text-gray-400 dark:text-navy-500 truncate">{postcodeLine(jobForm.shipper)}</p>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={swapShipperConsignee}
-                      disabled={locked}
-                      title="Swap shipper and consignee"
-                      className="group w-8 h-8 rounded-full bg-white dark:bg-navy-800 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center shadow-sm shrink-0 transition hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-navy-800"
-                    >
-                      <ArrowLeftRight size={13} className="text-emerald-600 dark:text-emerald-400 transition-transform group-hover:scale-110" />
-                    </button>
+                    <Tooltip content="Swap shipper and consignee" className="inline-flex shrink-0">
+                      <button
+                        type="button"
+                        onClick={swapShipperConsignee}
+                        disabled={locked}
+                        className="group w-8 h-8 rounded-full bg-white dark:bg-navy-800 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center shadow-sm shrink-0 transition hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-navy-800"
+                      >
+                        <ArrowLeftRight size={13} className="text-emerald-600 dark:text-emerald-400 transition-transform group-hover:scale-110" />
+                      </button>
+                    </Tooltip>
                     <div className="min-w-0 flex-1 text-right">
                       <p className="flex items-center justify-end gap-1 text-[9px] font-bold text-emerald-600/80 dark:text-emerald-400/70 uppercase tracking-wide">
                         To <Building2 size={11} />
