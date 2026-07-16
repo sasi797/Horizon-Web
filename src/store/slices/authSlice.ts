@@ -16,16 +16,16 @@ interface AuthState {
 const loadFromStorage = (): AuthState => {
   if (typeof window === 'undefined') return { accessToken: null, refreshToken: null, user: null };
   // One-time migration: if tokens only exist in sessionStorage, move them to localStorage
-  if (!localStorage.getItem('bts_access_token') && sessionStorage.getItem('bts_access_token')) {
-    ['bts_access_token', 'bts_refresh_token', 'bts_user'].forEach(key => {
+  if (!localStorage.getItem('horizon_access_token') && sessionStorage.getItem('horizon_access_token')) {
+    ['horizon_access_token', 'horizon_refresh_token', 'horizon_user'].forEach(key => {
       const v = sessionStorage.getItem(key);
       if (v) { localStorage.setItem(key, v); sessionStorage.removeItem(key); }
     });
   }
   return {
-    accessToken: localStorage.getItem('bts_access_token'),
-    refreshToken: localStorage.getItem('bts_refresh_token'),
-    user: JSON.parse(localStorage.getItem('bts_user') ?? 'null'),
+    accessToken: localStorage.getItem('horizon_access_token'),
+    refreshToken: localStorage.getItem('horizon_refresh_token'),
+    user: JSON.parse(localStorage.getItem('horizon_user') ?? 'null'),
   };
 };
 
@@ -39,23 +39,23 @@ const authSlice = createSlice({
       state.accessToken = payload.accessToken;
       state.refreshToken = payload.refreshToken;
       state.user = payload.user;
-      localStorage.setItem('bts_access_token', payload.accessToken);
-      localStorage.setItem('bts_refresh_token', payload.refreshToken);
-      localStorage.setItem('bts_user', JSON.stringify(payload.user));
+      localStorage.setItem('horizon_access_token', payload.accessToken);
+      localStorage.setItem('horizon_refresh_token', payload.refreshToken);
+      localStorage.setItem('horizon_user', JSON.stringify(payload.user));
     },
     setTokens(state, { payload }: PayloadAction<{ accessToken: string; refreshToken: string }>) {
       state.accessToken = payload.accessToken;
       state.refreshToken = payload.refreshToken;
-      localStorage.setItem('bts_access_token', payload.accessToken);
-      localStorage.setItem('bts_refresh_token', payload.refreshToken);
+      localStorage.setItem('horizon_access_token', payload.accessToken);
+      localStorage.setItem('horizon_refresh_token', payload.refreshToken);
     },
     logout(state) {
       state.accessToken = null;
       state.refreshToken = null;
       state.user = null;
-      localStorage.removeItem('bts_access_token');
-      localStorage.removeItem('bts_refresh_token');
-      localStorage.removeItem('bts_user');
+      localStorage.removeItem('horizon_access_token');
+      localStorage.removeItem('horizon_refresh_token');
+      localStorage.removeItem('horizon_user');
     },
   },
 });
