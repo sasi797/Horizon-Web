@@ -106,6 +106,7 @@ export interface HawbManifest {
   created_by_name: string | null;
   source_kind: 'plain' | 'blind';
   created_at: string;
+  hawb_numbers: string[];
 }
 
 export interface HawbManifestUpdate {
@@ -115,7 +116,8 @@ export interface HawbManifestUpdate {
 
 export interface HawbManifestDetail extends HawbManifest {
   jobs: HawbJob[];
-  documents: (HawbDocument & { pdf_url: string })[];
+  document: HawbDocument;
+  pdf_url: string;
 }
 
 export interface HawbJobPendingUpdate {
@@ -135,10 +137,6 @@ export const hawbApi = api.injectEndpoints({
     updateHawbJob: build.mutation<HawbJob, { id: string; body: HawbJobUpdate }>({
       query: ({ id, body }) => ({ url: `/hawb/jobs/${id}`, method: 'PATCH', body }),
       invalidatesTags: (_r, _e, { id }) => [{ type: 'HawbJob', id }, 'HawbJob'],
-    }),
-    approveHawbJob: build.mutation<HawbJob, string>({
-      query: (id) => ({ url: `/hawb/jobs/${id}/approve`, method: 'POST' }),
-      invalidatesTags: (_r, _e, id) => [{ type: 'HawbJob', id }, 'HawbJob', 'HawbManifest'],
     }),
     getHawbManifests: build.query<HawbManifest[], void>({
       query: () => '/hawb/manifests',
@@ -184,17 +182,12 @@ export const hawbApi = api.injectEndpoints({
       query: (id) => ({ url: `/hawb/job-updates/${id}/apply`, method: 'POST' }),
       invalidatesTags: ['HawbJobPendingUpdate', 'HawbJob', 'HawbManifest'],
     }),
-    dismissJobUpdate: build.mutation<HawbJobPendingUpdate, string>({
-      query: (id) => ({ url: `/hawb/job-updates/${id}/dismiss`, method: 'POST' }),
-      invalidatesTags: ['HawbJobPendingUpdate'],
-    }),
   }),
   overrideExisting: false,
 });
 
 export const {
   useUpdateHawbJobMutation,
-  useApproveHawbJobMutation,
   useGetHawbManifestsQuery,
   useGetHawbManifestQuery,
   useUpdateHawbManifestMutation,
@@ -205,5 +198,4 @@ export const {
   useMarkManifestExportedMutation,
   useGetJobUpdatesQuery,
   useApplyJobUpdateMutation,
-  useDismissJobUpdateMutation,
 } = hawbApi;

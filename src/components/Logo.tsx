@@ -1,7 +1,7 @@
-export default function Logo({ size = 28, className = '', onDark = false }: { size?: number; className?: string; onDark?: boolean }) {
-  const navyStroke = onDark ? 'stroke-slate-200' : 'stroke-slate-900 dark:stroke-navy-200';
-  const navyFill = onDark ? 'fill-slate-200' : 'fill-slate-900 dark:fill-navy-200';
-  const greenStroke = onDark ? 'stroke-emerald-400' : 'stroke-emerald-600 dark:stroke-emerald-400';
+export default function Logo({ size = 28, className = '' }: { size?: number; className?: string }) {
+  const navyStroke = 'stroke-slate-900 dark:stroke-navy-200';
+  const navyFill = 'fill-slate-900 dark:fill-navy-200';
+  const greenStroke = 'stroke-emerald-600 dark:stroke-emerald-400';
 
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
