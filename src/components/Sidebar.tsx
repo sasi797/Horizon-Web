@@ -26,8 +26,8 @@ import { useLogoutMutation } from '@/services/authApi';
 import { useTheme } from '@/providers/ThemeProvider';
 
 const adminItems = [
-  { icon: Users, label: 'Users', color: 'bg-blue-500 text-white' },
-  { icon: ShieldCheck, label: 'Roles', color: 'bg-purple-500 text-white' },
+  { icon: Users, label: 'Users', color: 'bg-blue-500 text-white', href: '/dashboard/users' },
+  { icon: ShieldCheck, label: 'Roles', color: 'bg-purple-500 text-white', href: '/dashboard/roles' },
 ];
 
 const systemItems = [
@@ -61,7 +61,8 @@ export default function Sidebar({
 
   const q = query.trim().toLowerCase();
   const showManifests = !q || 'manifests'.includes(q);
-  const filteredAdmin = adminItems.filter(({ label }) => !q || label.toLowerCase().includes(q));
+  const visibleAdminItems = user?.role === 'admin' ? adminItems : [];
+  const filteredAdmin = visibleAdminItems.filter(({ label }) => !q || label.toLowerCase().includes(q));
   const filteredSystem = systemItems.filter(({ label }) => !q || label.toLowerCase().includes(q));
   const hasResults = showManifests || filteredAdmin.length > 0 || filteredSystem.length > 0;
 
@@ -199,17 +200,22 @@ export default function Sidebar({
               <>
                 <p className="px-1 pt-2 pb-1 text-[11px] font-semibold text-gray-400 dark:text-navy-500 uppercase tracking-wide">Administration</p>
                 <div className="space-y-0.5 pb-2">
-                  {filteredAdmin.map(({ icon: Icon, label, color }) => (
-                    <motion.div
-                      key={label}
-                      variants={staggerItem}
-                      className="flex items-center gap-2 px-1 py-1 rounded-md hover:bg-gray-200/70 dark:hover:bg-white/5 cursor-pointer transition-colors"
-                    >
-                      <span className={`flex-shrink-0 w-[22px] h-[22px] rounded-md flex items-center justify-center ${color}`}>
-                        <Icon size={13} strokeWidth={2} />
-                      </span>
-                      <span className="flex-1 min-w-0 text-[13px] text-gray-700 dark:text-navy-200 truncate">{label}</span>
-                    </motion.div>
+                  {filteredAdmin.map(({ icon: Icon, label, color, href }) => (
+                    <Link key={label} href={href} onClick={onClose} className="no-underline">
+                      <motion.div
+                        variants={staggerItem}
+                        className={`flex items-center gap-2 px-1 py-1 rounded-md transition-colors cursor-pointer ${
+                          isActive(href)
+                            ? 'bg-gray-200/70 dark:bg-white/10'
+                            : 'hover:bg-gray-200/70 dark:hover:bg-white/5'
+                        }`}
+                      >
+                        <span className={`flex-shrink-0 w-[22px] h-[22px] rounded-md flex items-center justify-center ${color}`}>
+                          <Icon size={13} strokeWidth={2} />
+                        </span>
+                        <span className="flex-1 min-w-0 text-[13px] text-gray-700 dark:text-navy-200 truncate">{label}</span>
+                      </motion.div>
+                    </Link>
                   ))}
                 </div>
               </>

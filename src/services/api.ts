@@ -65,6 +65,6 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['HawbJob', 'HawbManifest', 'HawbJobPendingUpdate'],
+  tagTypes: ['HawbJob', 'HawbManifest', 'HawbJobPendingUpdate', 'User', 'Role'],
   endpoints: () => ({}),
 });
