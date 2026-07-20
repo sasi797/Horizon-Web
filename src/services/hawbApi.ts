@@ -98,10 +98,14 @@ export interface HawbManifest {
   reference_number: string;
   job_count: number;
   total_weight_kg: number;
-  status: 'pending_review' | 'open' | 'booked' | 'confirmed' | 'on_hold' | 'exported';
+  status: 'pending_review' | 'open' | 'booked' | 'confirmed' | 'on_hold' | 'exported' | 'cancelled';
   exported_at: string | null;
+  cancelled_at: string | null;
   start_point: string | null;
   end_point: string | null;
+  job_reference: string | null;
+  account_number: string | null;
+  vehicle_size: string | null;
   created_by: string | null;
   created_by_name: string | null;
   source_kind: 'plain' | 'blind';
@@ -112,6 +116,9 @@ export interface HawbManifest {
 export interface HawbManifestUpdate {
   start_point?: string | null;
   end_point?: string | null;
+  job_reference?: string | null;
+  account_number?: string | null;
+  vehicle_size?: string | null;
 }
 
 export interface HawbManifestDetail extends HawbManifest {
@@ -174,6 +181,14 @@ export const hawbApi = api.injectEndpoints({
       query: (manifestId) => ({ url: `/hawb/manifests/${manifestId}/mark-exported`, method: 'POST' }),
       invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest'],
     }),
+    cancelManifest: build.mutation<HawbManifest, string>({
+      query: (manifestId) => ({ url: `/hawb/manifests/${manifestId}/cancel`, method: 'POST' }),
+      invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest', 'HawbJob'],
+    }),
+    reopenManifest: build.mutation<HawbManifest, string>({
+      query: (manifestId) => ({ url: `/hawb/manifests/${manifestId}/reopen`, method: 'POST' }),
+      invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest', 'HawbJob'],
+    }),
     getJobUpdates: build.query<HawbJobPendingUpdate[], void>({
       query: () => '/hawb/job-updates',
       providesTags: ['HawbJobPendingUpdate'],
@@ -199,6 +214,8 @@ export const {
   useConfirmManifestMutation,
   useHoldManifestMutation,
   useMarkManifestExportedMutation,
+  useCancelManifestMutation,
+  useReopenManifestMutation,
   useGetJobUpdatesQuery,
   useGetProcessingDocumentsQuery,
   useApplyJobUpdateMutation,

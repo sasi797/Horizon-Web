@@ -13,11 +13,12 @@ import Tooltip from '@/components/Tooltip';
 
 const STATUS_BADGE: Record<string, string> = {
   pending_review: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
-  open: 'bg-slate-200 dark:bg-navy-700 text-slate-700 dark:text-navy-200',
+  open: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400',
   booked: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
   confirmed: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
   on_hold: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
   exported: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+  cancelled: 'bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400',
 };
 
 const TAG_COLORS = [
@@ -42,6 +43,7 @@ const STATUS_LABEL: Record<string, string> = {
   confirmed: 'Confirmed',
   on_hold: 'On Hold',
   exported: 'Exported',
+  cancelled: 'Cancelled',
 };
 
 const TABLE_COLUMNS = [
