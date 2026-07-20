@@ -2,11 +2,11 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, Package, CalendarDays, RefreshCw, CaseSensitive, CircleDot, Hash, User, File, Search, X } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
-import { useGetHawbManifestsQuery, useGetJobUpdatesQuery } from '@/services/hawbApi';
+import { useGetHawbManifestsQuery, useGetJobUpdatesQuery, useGetProcessingDocumentsQuery } from '@/services/hawbApi';
 import { useManifestsLiveRefresh } from '@/hooks/useManifestsLiveRefresh';
 import ApiErrorState from '@/components/ApiErrorState';
 import Tooltip from '@/components/Tooltip';
@@ -175,6 +175,67 @@ function HawbNumbersCell({ hawbNumbers }: { hawbNumbers: string[] }) {
   );
 }
 
+function Skel({ className = '' }: { className?: string }) {
+  return <span className={`block animate-pulse rounded-md bg-gray-100 dark:bg-navy-800 ${className}`} />;
+}
+
+function ManifestsTableSkeleton() {
+  return (
+    <div className="bg-white dark:bg-navy-900">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-gray-200 dark:border-navy-700">
+              {TABLE_COLUMNS.map(({ label, icon: Icon }, i) => (
+                <th
+                  key={label}
+                  className={`px-4 pb-2.5 text-[12px] font-medium text-gray-500 dark:text-navy-400 whitespace-nowrap ${i < TABLE_COLUMNS.length - 1 ? 'border-r border-gray-200 dark:border-navy-700' : ''}`}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <Icon size={13} strokeWidth={1.8} className="text-gray-400 dark:text-navy-500" />
+                    {label}
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <tr key={i} className="border-b border-gray-200 dark:border-navy-700">
+                <td className="px-4 py-2.5 border-r border-gray-200 dark:border-navy-700">
+                  <Skel className="w-20 h-3.5" />
+                </td>
+                <td className="px-2 py-2.5 border-r border-gray-200 dark:border-navy-700">
+                  <Skel className="w-16 h-5 rounded-full" />
+                </td>
+                <td className="px-2 py-2.5 border-r border-gray-200 dark:border-navy-700">
+                  <Skel className="w-4 h-3.5" />
+                </td>
+                <td className="px-2 py-2.5 border-r border-gray-200 dark:border-navy-700">
+                  <div className="flex items-center gap-1">
+                    <Skel className="w-16 h-4" />
+                    <Skel className="w-16 h-4" />
+                    <Skel className="w-16 h-4" />
+                  </div>
+                </td>
+                <td className="px-2 py-2.5 border-r border-gray-200 dark:border-navy-700">
+                  <Skel className="w-10 h-3.5" />
+                </td>
+                <td className="px-2 py-2.5 border-r border-gray-200 dark:border-navy-700">
+                  <Skel className="w-14 h-5 rounded-full" />
+                </td>
+                <td className="pl-2 pr-4 py-2.5">
+                  <Skel className="w-24 h-3.5" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function formatDateTime(value: string): string {
   const d = new Date(value);
   const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -183,8 +244,10 @@ function formatDateTime(value: string): string {
 }
 
 export default function ManifestsPage() {
+  const router = useRouter();
   const { data: manifests = [], isLoading, isError, refetch } = useGetHawbManifestsQuery();
   const { data: jobUpdates = [] } = useGetJobUpdatesQuery();
+  const { data: processingDocs = [] } = useGetProcessingDocumentsQuery(undefined, { pollingInterval: 8000 });
   useManifestsLiveRefresh();
   const [search, setSearch] = useState('');
 
@@ -240,12 +303,15 @@ export default function ManifestsPage() {
         </div>
       </motion.div>
 
+      {processingDocs.length > 0 && (
+        <motion.div variants={staggerItem} className="flex items-center gap-2 text-[11.5px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-lg px-3 py-2">
+          <RefreshCw size={12} className="animate-spin" />
+          Processing {processingDocs.length} email{processingDocs.length === 1 ? '' : 's'}…
+        </motion.div>
+      )}
+
       {isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-12 bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 animate-pulse" />
-          ))}
-        </div>
+        <ManifestsTableSkeleton />
       ) : isError ? (
         <ApiErrorState title="Failed to load manifests" onRetry={refetch} />
       ) : filteredManifests.length === 0 ? (
@@ -275,14 +341,24 @@ export default function ManifestsPage() {
                 {filteredManifests.map((m) => (
                   <tr
                     key={m.id}
-                    className="group border-b border-gray-200 dark:border-navy-700 hover:border-emerald-300 dark:hover:border-emerald-700/50 hover:bg-gray-50/60 dark:hover:bg-navy-800/30 transition-colors"
+                    onClick={() => router.push(`/dashboard/manifests/${m.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        router.push(`/dashboard/manifests/${m.id}`);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`Open manifest ${m.reference_number}`}
+                    className="group relative border-b border-gray-200 dark:border-navy-700 cursor-pointer outline-none transition-all duration-150 hover:z-10 focus-visible:z-10 hover:-translate-y-px focus-visible:-translate-y-px hover:bg-emerald-50/40 dark:hover:bg-emerald-950/10 hover:shadow-[0_4px_16px_-4px_rgba(16,185,129,0.3)] dark:hover:shadow-[0_4px_16px_-4px_rgba(16,185,129,0.2)] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-emerald-400"
                   >
-                    <td className="px-4 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap">
+                    <td className="px-4 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap group-hover:rounded-l-lg">
                       <span className="inline-flex items-center gap-1.5">
-                        <File size={13} strokeWidth={1.8} className="text-gray-300 dark:text-navy-600 shrink-0" />
-                        <Link href={`/dashboard/manifests/${m.id}`} className="font-mono font-semibold text-gray-900 dark:text-gray-100 text-[12.5px] hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+                        <File size={13} strokeWidth={1.8} className="text-gray-300 dark:text-navy-600 shrink-0 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors" />
+                        <span className="font-mono font-semibold text-gray-900 dark:text-gray-100 text-[12.5px] group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                           {m.reference_number}
-                        </Link>
+                        </span>
                         <PendingUpdateBadge count={pendingUpdateCounts.get(m.id) ?? 0} />
                       </span>
                     </td>
@@ -302,10 +378,10 @@ export default function ManifestsPage() {
                         {m.created_by_name ?? 'System'}
                       </span>
                     </td>
-                    <td className="pl-2 pr-4 py-2 whitespace-nowrap">
+                    <td className="pl-2 pr-4 py-2 whitespace-nowrap group-hover:rounded-r-lg">
                       <span className="inline-flex items-center gap-1">
                         <span className="text-[11px] text-gray-500 dark:text-navy-400">{formatDateTime(m.created_at)}</span>
-                        <ChevronRight size={13} className="ml-1 text-gray-300 dark:text-navy-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <ChevronRight size={13} className="ml-1 text-gray-300 dark:text-navy-600 opacity-0 -translate-x-0.5 group-hover:opacity-100 group-hover:translate-x-0 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-all" />
                       </span>
                     </td>
                   </tr>

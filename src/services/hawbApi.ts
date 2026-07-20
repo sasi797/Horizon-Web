@@ -178,6 +178,9 @@ export const hawbApi = api.injectEndpoints({
       query: () => '/hawb/job-updates',
       providesTags: ['HawbJobPendingUpdate'],
     }),
+    getProcessingDocuments: build.query<HawbDocument[], void>({
+      query: () => '/hawb/documents/processing',
+    }),
     applyJobUpdate: build.mutation<HawbJob, string>({
       query: (id) => ({ url: `/hawb/job-updates/${id}/apply`, method: 'POST' }),
       invalidatesTags: ['HawbJobPendingUpdate', 'HawbJob', 'HawbManifest'],
@@ -197,5 +200,6 @@ export const {
   useHoldManifestMutation,
   useMarkManifestExportedMutation,
   useGetJobUpdatesQuery,
+  useGetProcessingDocumentsQuery,
   useApplyJobUpdateMutation,
 } = hawbApi;

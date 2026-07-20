@@ -71,6 +71,94 @@ function pageRangeLabel(job: HawbJob): string | null {
   return count > 1 ? `Pages ${job.page_start}–${end}` : `Page ${job.page_start}`;
 }
 
+function Skel({ className = '' }: { className?: string }) {
+  return <span className={`block animate-pulse rounded-md bg-gray-100 dark:bg-navy-800 ${className}`} />;
+}
+
+function ManifestDetailSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <Skel className="w-7 h-7 rounded-md shrink-0" />
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Skel className="w-28 h-4" />
+              <Skel className="w-20 h-5 rounded-full" />
+            </div>
+            <Skel className="w-64 h-3" />
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Skel className="w-32 h-7 rounded-md" />
+          <Skel className="w-24 h-7 rounded-md" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-4 py-3">
+            <Skel className="w-8 h-8 rounded-lg shrink-0" />
+            <div className="min-w-0 space-y-1.5 flex-1">
+              <Skel className="w-16 h-2" />
+              <Skel className="w-12 h-4" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-4 py-3 space-y-1.5">
+            <Skel className="w-24 h-2" />
+            <Skel className="w-full h-9 rounded-xl" />
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[600px]">
+        <div className="order-2 flex flex-col gap-2">
+          <div className="flex items-center justify-between px-1">
+            <Skel className="w-20 h-3" />
+          </div>
+          <div className="flex-1 bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm px-4 py-4 space-y-6">
+            <Skel className="w-full h-24 rounded-2xl" />
+            <div className="grid grid-cols-2 gap-4">
+              <Skel className="w-full h-24 rounded-xl" />
+              <Skel className="w-full h-24 rounded-xl" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Skel className="w-full h-16 rounded-xl" />
+              <Skel className="w-full h-16 rounded-xl" />
+            </div>
+            <Skel className="w-full h-40 rounded-xl" />
+          </div>
+        </div>
+
+        <div className="order-1 flex flex-col bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-navy-800 space-y-1.5">
+            <Skel className="w-20 h-3" />
+            <Skel className="w-48 h-2.5" />
+          </div>
+          <div className="flex-1 divide-y divide-gray-50 dark:divide-navy-800/70">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                <Skel className="w-4 h-2.5 shrink-0" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Skel className="w-24 h-2.5" />
+                  <Skel className="w-40 h-2" />
+                </div>
+                <Skel className="w-8 h-2.5 shrink-0" />
+                <Skel className="w-8 h-2.5 shrink-0" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
@@ -301,7 +389,7 @@ export default function ManifestDetailPage() {
   }, [selectedJob, syncedFormFor]);
 
   if (isLoading) {
-    return <div className="h-64 bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 animate-pulse" />;
+    return <ManifestDetailSkeleton />;
   }
   if (isError || !manifest) {
     return <ApiErrorState title="Failed to load manifest" onRetry={refetch} />;
