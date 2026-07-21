@@ -98,7 +98,7 @@ export interface HawbManifest {
   reference_number: string;
   job_count: number;
   total_weight_kg: number;
-  status: 'pending_review' | 'open' | 'booked' | 'confirmed' | 'on_hold' | 'exported' | 'cancelled';
+  status: 'pending_review' | 'open' | 'booked' | 'confirmed' | 'on_hold' | 'exported' | 'cancelled' | 'extracting' | 'failed';
   exported_at: string | null;
   cancelled_at: string | null;
   start_point: string | null;
@@ -111,6 +111,7 @@ export interface HawbManifest {
   source_kind: 'plain' | 'blind';
   created_at: string;
   hawb_numbers: string[];
+  remarks: string | null;
 }
 
 export interface HawbManifestUpdate {
@@ -189,6 +190,10 @@ export const hawbApi = api.injectEndpoints({
       query: (manifestId) => ({ url: `/hawb/manifests/${manifestId}/reopen`, method: 'POST' }),
       invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest', 'HawbJob'],
     }),
+    retryManifestExtraction: build.mutation<HawbManifest, string>({
+      query: (manifestId) => ({ url: `/hawb/manifests/${manifestId}/retry-extraction`, method: 'POST' }),
+      invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest'],
+    }),
     getJobUpdates: build.query<HawbJobPendingUpdate[], void>({
       query: () => '/hawb/job-updates',
       providesTags: ['HawbJobPendingUpdate'],
@@ -216,6 +221,7 @@ export const {
   useMarkManifestExportedMutation,
   useCancelManifestMutation,
   useReopenManifestMutation,
+  useRetryManifestExtractionMutation,
   useGetJobUpdatesQuery,
   useGetProcessingDocumentsQuery,
   useApplyJobUpdateMutation,

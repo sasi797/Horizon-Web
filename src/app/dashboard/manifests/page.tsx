@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Package, CalendarDays, RefreshCw, CaseSensitive, CircleDot, Hash, User, File, Search, X } from 'lucide-react';
+import { ChevronRight, Package, CalendarDays, RefreshCw, CaseSensitive, CircleDot, Hash, User, File, Search, X, CheckCircle2, FileSearch, MessageSquare } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
-import { useGetHawbManifestsQuery, useGetJobUpdatesQuery, useGetProcessingDocumentsQuery } from '@/services/hawbApi';
+import {
+  useGetHawbManifestsQuery, useGetJobUpdatesQuery, useGetProcessingDocumentsQuery, useRetryManifestExtractionMutation,
+} from '@/services/hawbApi';
 import { useManifestsLiveRefresh } from '@/hooks/useManifestsLiveRefresh';
 import ApiErrorState from '@/components/ApiErrorState';
 import Tooltip from '@/components/Tooltip';
@@ -19,6 +21,21 @@ const STATUS_BADGE: Record<string, string> = {
   on_hold: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
   exported: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
   cancelled: 'bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400',
+};
+
+// The manifest's own Status column only makes sense once extraction has produced
+// jobs — while extracting or failed, this column shows '—' and the separate
+// Extract column (loading / completed / failed) carries the meaningful state.
+const EXTRACT_BADGE: Record<'loading' | 'completed' | 'failed', string> = {
+  loading: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400',
+  completed: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400',
+  failed: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+};
+
+const EXTRACT_LABEL: Record<'loading' | 'completed' | 'failed', string> = {
+  loading: 'Extracting…',
+  completed: 'Completed',
+  failed: 'Failed',
 };
 
 const TAG_COLORS = [
@@ -49,6 +66,8 @@ const STATUS_LABEL: Record<string, string> = {
 const TABLE_COLUMNS = [
   { label: 'Reference', icon: CaseSensitive },
   { label: 'Status', icon: CircleDot },
+  { label: 'Extract', icon: FileSearch },
+  { label: 'Remarks', icon: MessageSquare },
   { label: 'Jobs', icon: Hash },
   { label: 'HAWB Numbers', icon: Hash },
   { label: 'Total Weight (kg)', icon: Hash },
@@ -211,6 +230,12 @@ function ManifestsTableSkeleton() {
                   <Skel className="w-16 h-5 rounded-full" />
                 </td>
                 <td className="px-2 py-2.5 border-r border-gray-200 dark:border-navy-700">
+                  <Skel className="w-16 h-5 rounded-full" />
+                </td>
+                <td className="px-2 py-2.5 border-r border-gray-200 dark:border-navy-700">
+                  <Skel className="w-24 h-3.5" />
+                </td>
+                <td className="px-2 py-2.5 border-r border-gray-200 dark:border-navy-700">
                   <Skel className="w-4 h-3.5" />
                 </td>
                 <td className="px-2 py-2.5 border-r border-gray-200 dark:border-navy-700">
@@ -249,9 +274,13 @@ export default function ManifestsPage() {
   const router = useRouter();
   const { data: manifests = [], isLoading, isError, refetch } = useGetHawbManifestsQuery();
   const { data: jobUpdates = [] } = useGetJobUpdatesQuery();
-  const { data: processingDocs = [] } = useGetProcessingDocumentsQuery(undefined, { pollingInterval: 8000 });
+  const { data: allProcessingDocs = [] } = useGetProcessingDocumentsQuery(undefined, { pollingInterval: 8000 });
+  // Plain documents now get a placeholder manifest row instead — only MF-PCS
+  // (blind) documents still rely on this banner, since they never get a row.
+  const processingDocs = allProcessingDocs.filter(d => d.source_kind === 'blind');
   useManifestsLiveRefresh();
   const [search, setSearch] = useState('');
+  const [retryExtraction, { isLoading: retrying, originalArgs: retryingManifestId }] = useRetryManifestExtractionMutation();
 
   const pendingUpdateCounts = new Map<string, number>();
   for (const u of jobUpdates) {
@@ -308,7 +337,7 @@ export default function ManifestsPage() {
       {processingDocs.length > 0 && (
         <motion.div variants={staggerItem} className="flex items-center gap-2 text-[11.5px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-lg px-3 py-2">
           <RefreshCw size={12} className="animate-spin" />
-          Processing {processingDocs.length} email{processingDocs.length === 1 ? '' : 's'}…
+          Processing {processingDocs.length} MF-PCS email{processingDocs.length === 1 ? '' : 's'}…
         </motion.div>
       )}
 
@@ -316,10 +345,6 @@ export default function ManifestsPage() {
         <ManifestsTableSkeleton />
       ) : isError ? (
         <ApiErrorState title="Failed to load manifests" onRetry={refetch} />
-      ) : filteredManifests.length === 0 ? (
-        <div className="flex items-center justify-center h-48 text-gray-300 dark:text-navy-600 text-sm bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800">
-          {q ? 'No manifests match your search' : 'No manifests yet'}
-        </div>
       ) : (
         <motion.div variants={staggerItem} className="bg-white dark:bg-navy-900">
           <div className="overflow-x-auto">
@@ -340,20 +365,39 @@ export default function ManifestsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredManifests.map((m) => (
+                {filteredManifests.length === 0 && (
+                  <tr>
+                    <td colSpan={TABLE_COLUMNS.length} className="h-48 text-center text-gray-300 dark:text-navy-600 text-sm">
+                      {q ? 'No manifests match your search' : 'No manifests yet'}
+                    </td>
+                  </tr>
+                )}
+                {filteredManifests.map((m) => {
+                  const isExtracting = m.status === 'extracting';
+                  const isFailed = m.status === 'failed';
+                  const isPending = isExtracting || isFailed;
+                  const isRetrying = retrying && retryingManifestId === m.id;
+
+                  return (
                   <tr
                     key={m.id}
-                    onClick={() => router.push(`/dashboard/manifests/${m.id}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        router.push(`/dashboard/manifests/${m.id}`);
-                      }
-                    }}
-                    tabIndex={0}
-                    role="link"
-                    aria-label={`Open manifest ${m.reference_number}`}
-                    className="group relative border-b border-gray-200 dark:border-navy-700 cursor-pointer outline-none transition-all duration-150 hover:z-10 focus-visible:z-10 hover:-translate-y-px focus-visible:-translate-y-px hover:bg-emerald-50/40 dark:hover:bg-emerald-950/10 hover:shadow-[0_4px_16px_-4px_rgba(16,185,129,0.3)] dark:hover:shadow-[0_4px_16px_-4px_rgba(16,185,129,0.2)] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-emerald-400"
+                    {...(isPending ? {} : {
+                      onClick: () => router.push(`/dashboard/manifests/${m.id}`),
+                      onKeyDown: (e: ReactKeyboardEvent<HTMLTableRowElement>) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          router.push(`/dashboard/manifests/${m.id}`);
+                        }
+                      },
+                      tabIndex: 0,
+                      role: 'link',
+                      'aria-label': `Open manifest ${m.reference_number}`,
+                    })}
+                    className={`group relative border-b border-gray-200 dark:border-navy-700 outline-none transition-all duration-150 ${
+                      isPending
+                        ? ''
+                        : 'cursor-pointer hover:z-10 focus-visible:z-10 hover:-translate-y-px focus-visible:-translate-y-px hover:bg-emerald-50/40 dark:hover:bg-emerald-950/10 hover:shadow-[0_4px_16px_-4px_rgba(16,185,129,0.3)] dark:hover:shadow-[0_4px_16px_-4px_rgba(16,185,129,0.2)] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-emerald-400'
+                    }`}
                   >
                     <td className="px-4 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap group-hover:rounded-l-lg">
                       <span className="inline-flex items-center gap-1.5">
@@ -365,16 +409,55 @@ export default function ManifestsPage() {
                       </span>
                     </td>
                     <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${STATUS_BADGE[m.status]}`}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
-                        {STATUS_LABEL[m.status]}
+                      {isPending ? (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
+                          Pending
+                        </span>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${STATUS_BADGE[m.status]}`}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
+                          {STATUS_LABEL[m.status]}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap">
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${EXTRACT_BADGE[isExtracting ? 'loading' : isFailed ? 'failed' : 'completed']}`}>
+                        {isExtracting && <RefreshCw size={9} className="animate-spin" />}
+                        {isFailed && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />}
+                        {!isPending && <CheckCircle2 size={9} />}
+                        {EXTRACT_LABEL[isExtracting ? 'loading' : isFailed ? 'failed' : 'completed']}
                       </span>
+                      {isFailed && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); retryExtraction(m.id); }}
+                          disabled={isRetrying}
+                          aria-label="Retry extraction"
+                          className="ml-1.5 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-navy-800 text-gray-500 dark:text-navy-300 hover:bg-gray-200 dark:hover:bg-navy-700 disabled:opacity-50 transition-colors"
+                        >
+                          <RefreshCw size={9} className={isRetrying ? 'animate-spin' : ''} />
+                          Retry
+                        </button>
+                      )}
                     </td>
-                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] font-medium text-gray-700 dark:text-navy-200">{m.job_count}</td>
+                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] text-gray-500 dark:text-navy-400">
+                      {m.remarks ? (
+                        <div
+                          onClick={e => e.stopPropagation()}
+                          className="max-w-[220px] overflow-x-auto whitespace-nowrap"
+                        >
+                          {m.remarks}
+                        </div>
+                      ) : (
+                        <span className="text-gray-300 dark:text-navy-600">—</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] font-medium text-gray-700 dark:text-navy-200">{isPending ? '—' : m.job_count}</td>
                     <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 max-w-[280px]">
-                      <HawbNumbersCell hawbNumbers={m.hawb_numbers} />
+                      {isPending ? <span className="text-[12px] text-gray-400 dark:text-navy-500">—</span> : <HawbNumbersCell hawbNumbers={m.hawb_numbers} />}
                     </td>
-                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] font-medium text-gray-700 dark:text-navy-200">{m.total_weight_kg}</td>
+                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] font-medium text-gray-700 dark:text-navy-200">{isPending ? '—' : m.total_weight_kg}</td>
                     <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap">
                       <span className={`inline-flex items-center text-[11px] font-medium px-2.5 py-1 rounded-full ${tagColor(m.created_by_name ?? 'System')}`}>
                         {m.created_by_name ?? 'System'}
@@ -383,11 +466,14 @@ export default function ManifestsPage() {
                     <td className="pl-2 pr-4 py-2 whitespace-nowrap group-hover:rounded-r-lg">
                       <span className="inline-flex items-center gap-1">
                         <span className="text-[11px] text-gray-500 dark:text-navy-400">{formatDateTime(m.created_at)}</span>
-                        <ChevronRight size={13} className="ml-1 text-gray-300 dark:text-navy-600 opacity-0 -translate-x-0.5 group-hover:opacity-100 group-hover:translate-x-0 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-all" />
+                        {!isPending && (
+                          <ChevronRight size={13} className="ml-1 text-gray-300 dark:text-navy-600 opacity-0 -translate-x-0.5 group-hover:opacity-100 group-hover:translate-x-0 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-all" />
+                        )}
                       </span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

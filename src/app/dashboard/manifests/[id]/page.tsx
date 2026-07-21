@@ -12,6 +12,7 @@ import {
   useReorderManifestJobsMutation,
   useCancelManifestMutation,
   useReopenManifestMutation,
+  useRetryManifestExtractionMutation,
   useGetJobUpdatesQuery,
   useApplyJobUpdateMutation,
   type HawbJob,
@@ -30,6 +31,8 @@ const MANIFEST_STATUS_BADGE: Record<string, string> = {
   on_hold: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
   exported: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
   cancelled: 'bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400',
+  extracting: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400',
+  failed: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
 };
 
 const MANIFEST_STATUS_LABEL: Record<string, string> = {
@@ -40,6 +43,8 @@ const MANIFEST_STATUS_LABEL: Record<string, string> = {
   on_hold: 'On Hold',
   exported: 'Exported',
   cancelled: 'Cancelled',
+  extracting: 'Extracting…',
+  failed: 'Extraction Failed',
 };
 
 // Stub list — real account numbers (keyed off the collection address) are pending; swap this
@@ -186,6 +191,55 @@ function ManifestDetailSkeleton() {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Shown instead of the full field-editor/job-table layout for a manifest that
+// has no jobs yet — either still extracting, or extraction landed on nothing
+// to manifest (a real failure, or every HAWB turned out to be a duplicate).
+// Reachable by direct URL even though the manifests table keeps these rows
+// non-clickable.
+function ManifestPlaceholderState({ manifest, onBack }: { manifest: HawbManifestDetail; onBack: () => void }) {
+  const [retryExtraction, { isLoading: retrying }] = useRetryManifestExtractionMutation();
+  const isFailed = manifest.status === 'failed';
+
+  return (
+    <div className="flex flex-col items-center gap-3 bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 py-16 px-6 text-center">
+      <button
+        onClick={onBack}
+        className="self-start flex items-center gap-1.5 text-[11.5px] font-semibold text-gray-500 dark:text-navy-400 hover:text-gray-800 dark:hover:text-navy-100 transition-colors mb-2"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to manifests
+      </button>
+      <span className={`inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2.5 py-0.5 rounded-full ${MANIFEST_STATUS_BADGE[manifest.status]}`}>
+        {isFailed ? <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" /> : <RefreshCw size={9} className="animate-spin" />}
+        {MANIFEST_STATUS_LABEL[manifest.status]}
+      </span>
+      <h1 className="text-[13px] font-bold text-gray-700 dark:text-navy-200">{manifest.document.filename}</h1>
+      {isFailed ? (
+        <>
+          <p className="text-[12px] text-gray-400 dark:text-navy-500 max-w-sm">
+            {manifest.remarks ?? 'Extraction failed for this document, so there is nothing to manifest yet.'} Retry to re-process the PDF already on file — no need to resend the email.
+          </p>
+          <button
+            type="button"
+            onClick={() => retryExtraction(manifest.id)}
+            disabled={retrying}
+            className="flex items-center gap-1.5 text-[11.5px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-60 pl-2 pr-3 py-1 rounded-md transition-colors"
+          >
+            <RefreshCw size={11} strokeWidth={2.25} className={retrying ? 'animate-spin' : ''} />
+            {retrying ? 'Retrying…' : 'Retry extraction'}
+          </button>
+        </>
+      ) : (
+        <p className="text-[12px] text-gray-400 dark:text-navy-500 max-w-sm">
+          Extraction is still in progress — this page will update automatically once it finishes.
+        </p>
+      )}
     </div>
   );
 }
@@ -465,6 +519,9 @@ export default function ManifestDetailPage() {
   }
   if (isError || !manifest) {
     return <ApiErrorState title="Failed to load manifest" onRetry={refetch} />;
+  }
+  if (manifest.status === 'extracting' || manifest.status === 'failed') {
+    return <ManifestPlaceholderState manifest={manifest} onBack={() => router.push('/dashboard/manifests')} />;
   }
 
   // Export no longer flips manifest.status (it stays 'open') — exported_at is now
