@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as Rea
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Package, CalendarDays, RefreshCw, CaseSensitive, CircleDot, Hash, User, File, Search, X, CheckCircle2, FileSearch, MessageSquare } from 'lucide-react';
+import { ChevronRight, Package, CalendarDays, RefreshCw, CaseSensitive, CircleDot, Hash, User, File, Search, X, CheckCircle2, FileSearch, MessageSquare, History } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestsQuery, useGetJobUpdatesQuery, useGetProcessingDocumentsQuery, useRetryManifestExtractionMutation,
@@ -311,26 +311,36 @@ export default function ManifestsPage() {
             </p>
           </div>
         </div>
-        <div className="relative shrink-0">
-          <Search size={13} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-navy-500 pointer-events-none" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search reference, HAWB, operator…"
-            aria-label="Search manifests"
-            className="w-64 h-8 pl-8 pr-7 bg-transparent border-0 border-b border-gray-200 dark:border-navy-700 text-[12px] text-gray-700 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch('')}
-              aria-label="Clear search"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-300 dark:text-navy-600 hover:text-gray-500 dark:hover:text-navy-400 transition-colors"
-            >
-              <X size={13} />
-            </button>
-          )}
+        <div className="flex items-center gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/manifests/history')}
+            className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 dark:text-navy-400 hover:text-gray-700 dark:hover:text-navy-200 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-navy-800 transition-colors"
+          >
+            <History size={13} strokeWidth={1.8} />
+            Merge History
+          </button>
+          <div className="relative">
+            <Search size={13} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-navy-500 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search reference, HAWB, operator…"
+              aria-label="Search manifests"
+              className="w-64 h-8 pl-8 pr-7 bg-transparent border-0 border-b border-gray-200 dark:border-navy-700 text-[12px] text-gray-700 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-300 dark:text-navy-600 hover:text-gray-500 dark:hover:text-navy-400 transition-colors"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
         </div>
       </motion.div>
 

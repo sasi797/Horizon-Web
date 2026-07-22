@@ -194,8 +194,8 @@ export const hawbApi = api.injectEndpoints({
       query: (manifestId) => ({ url: `/hawb/manifests/${manifestId}/retry-extraction`, method: 'POST' }),
       invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest'],
     }),
-    getJobUpdates: build.query<HawbJobPendingUpdate[], void>({
-      query: () => '/hawb/job-updates',
+    getJobUpdates: build.query<HawbJobPendingUpdate[], string | void>({
+      query: (status) => (status ? `/hawb/job-updates?status=${status}` : '/hawb/job-updates'),
       providesTags: ['HawbJobPendingUpdate'],
     }),
     getProcessingDocuments: build.query<HawbDocument[], void>({
@@ -204,6 +204,10 @@ export const hawbApi = api.injectEndpoints({
     applyJobUpdate: build.mutation<HawbJob, string>({
       query: (id) => ({ url: `/hawb/job-updates/${id}/apply`, method: 'POST' }),
       invalidatesTags: ['HawbJobPendingUpdate', 'HawbJob', 'HawbManifest'],
+    }),
+    dismissJobUpdate: build.mutation<HawbJobPendingUpdate, string>({
+      query: (id) => ({ url: `/hawb/job-updates/${id}/dismiss`, method: 'POST' }),
+      invalidatesTags: ['HawbJobPendingUpdate'],
     }),
   }),
   overrideExisting: false,
@@ -225,4 +229,5 @@ export const {
   useGetJobUpdatesQuery,
   useGetProcessingDocumentsQuery,
   useApplyJobUpdateMutation,
+  useDismissJobUpdateMutation,
 } = hawbApi;

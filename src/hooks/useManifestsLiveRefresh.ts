@@ -17,7 +17,11 @@ export function useManifestsLiveRefresh() {
     const source = new EventSource(`/api/manifests-stream?token=${encodeURIComponent(accessToken)}`);
 
     source.addEventListener('manifests-updated', () => {
-      dispatch(api.util.invalidateTags(['HawbManifest']));
+      // A manifest-list change always comes from the same background email-ingestion
+      // batch that may also create/resolve HawbJobPendingUpdate rows (duplicates,
+      // blind companions) — refresh both together so the auto-apply effect on the
+      // manifest detail page sees new pending updates without a manual page reload.
+      dispatch(api.util.invalidateTags(['HawbManifest', 'HawbJobPendingUpdate']));
     });
 
     return () => source.close();
