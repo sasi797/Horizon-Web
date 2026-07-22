@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -129,6 +129,30 @@ export default function Tooltip({
     setArrowOffset(prev => (prev !== null && Math.abs(prev - nextArrowOffset) < 0.5 ? prev : nextArrowOffset));
   }, [open, coords, effectiveSide]);
 
+  // The anchor is only measured once, at show() — but the trigger can move out from
+  // under an already-open tooltip (a live-refreshed list re-rendering its rows, a
+  // window resize, an ancestor scrolling) without the tooltip ever hearing about it.
+  // Re-measure every frame while open so the tooltip stays glued to its trigger
+  // instead of drifting onto whatever ends up at its old screen position.
+  useEffect(() => {
+    if (!open) return;
+    let frame: number;
+    const track = () => {
+      const rect = ref.current?.getBoundingClientRect();
+      if (rect) {
+        const anchor = anchorFor(effectiveSide, rect);
+        const prev = anchorRef.current;
+        if (!prev || Math.abs(prev.top - anchor.top) > 0.5 || Math.abs(prev.left - anchor.left) > 0.5) {
+          anchorRef.current = anchor;
+          setCoords(coordsFor(anchor, effectiveSide));
+        }
+      }
+      frame = requestAnimationFrame(track);
+    };
+    frame = requestAnimationFrame(track);
+    return () => cancelAnimationFrame(frame);
+  }, [open, effectiveSide]);
+
   if (!content) return <>{children}</>;
 
   const show = () => {
@@ -161,23 +185,33 @@ export default function Tooltip({
       {typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
           {open && coords && (
-            <motion.span
+            // Positioning (fixed + the static anchor-to-box translate) lives on this
+            // plain wrapper, not the motion element below — framer-motion drives the
+            // `transform` CSS property itself for scale/opacity animation and silently
+            // overwrites any static transform string passed via a motion component's
+            // own `style` prop, which otherwise strands the tooltip at the raw
+            // top/left coords with no anchor offset applied.
+            <span
               ref={tooltipRef}
-              role="tooltip"
-              initial={{ opacity: 0, scale: 0.92 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.92 }}
-              transition={{ duration: 0.12, ease: 'easeOut' }}
               style={{ position: 'fixed', top: coords.top, left: coords.left, transform: TRANSLATE[effectiveSide] }}
-              className="z-[100] pointer-events-none max-w-[260px] px-2.5 py-1.5 rounded-lg bg-gray-900/95 dark:bg-navy-800/95 backdrop-blur-sm text-white text-[11px] font-semibold leading-snug shadow-lg ring-1 ring-black/5 dark:ring-white/10 whitespace-normal break-words"
+              className="z-[100] pointer-events-none w-max max-w-[260px]"
             >
-              {content}
-              <span
-                aria-hidden
-                style={arrowStyle}
-                className={`absolute w-2 h-2 bg-gray-900/95 dark:bg-navy-800/95 ${ARROW_EDGE[effectiveSide]}`}
-              />
-            </motion.span>
+              <motion.span
+                role="tooltip"
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.92 }}
+                transition={{ duration: 0.12, ease: 'easeOut' }}
+                className="relative block px-2.5 py-1.5 rounded-lg bg-gray-900/95 dark:bg-navy-800/95 backdrop-blur-sm text-white text-[11px] font-semibold leading-snug shadow-lg ring-1 ring-black/5 dark:ring-white/10 whitespace-normal break-words"
+              >
+                {content}
+                <span
+                  aria-hidden
+                  style={arrowStyle}
+                  className={`absolute w-2 h-2 bg-gray-900/95 dark:bg-navy-800/95 ${ARROW_EDGE[effectiveSide]}`}
+                />
+              </motion.span>
+            </span>
           )}
         </AnimatePresence>,
         document.body

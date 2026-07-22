@@ -75,7 +75,7 @@ const TABLE_COLUMNS = [
   { label: 'Created', icon: CalendarDays },
 ];
 
-const HAWB_PREVIEW_COUNT = 3;
+const HAWB_PREVIEW_COUNT = 2;
 
 function PendingUpdateBadge({ count, className = '' }: { count: number; className?: string }) {
   if (!count) return null;
@@ -150,14 +150,14 @@ function HawbNumbersCell({ hawbNumbers }: { hawbNumbers: string[] }) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className="flex flex-nowrap items-center gap-1">
       {preview.map(h => <HawbTag key={h} value={h} />)}
       {overflowCount > 0 && (
         <button
           ref={triggerRef}
           type="button"
           onClick={(e) => { e.stopPropagation(); toggleOpen(); }}
-          className={`text-[10.5px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap transition-colors ${
+          className={`shrink-0 text-[10.5px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap transition-colors ${
             open
               ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400'
               : 'bg-gray-50 dark:bg-navy-800/60 text-gray-400 dark:text-navy-500 hover:bg-gray-100 dark:hover:bg-navy-800'
@@ -451,14 +451,16 @@ export default function ManifestsPage() {
                         </button>
                       )}
                     </td>
-                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] text-gray-500 dark:text-navy-400">
+                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] text-gray-500 dark:text-navy-400 max-w-[220px]">
                       {m.remarks ? (
-                        <div
-                          onClick={e => e.stopPropagation()}
-                          className="max-w-[220px] overflow-x-auto whitespace-nowrap"
-                        >
-                          {m.remarks}
-                        </div>
+                        <Tooltip content={m.remarks} side="top" className="block max-w-[220px]">
+                          <div
+                            onClick={e => e.stopPropagation()}
+                            className="max-w-[220px] truncate cursor-default"
+                          >
+                            {m.remarks}
+                          </div>
+                        </Tooltip>
                       ) : (
                         <span className="text-gray-300 dark:text-navy-600">—</span>
                       )}

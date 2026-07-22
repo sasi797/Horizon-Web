@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Check, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, ArrowLeftRight, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Weight, Navigation, Flag, Ban, CalendarDays, User, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, Check, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Weight, Navigation, Flag, Ban, List, Combine } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestQuery,
@@ -92,10 +92,6 @@ function buildExportPayload(manifest: HawbManifestDetail, jobs: HawbJob[]) {
   };
 }
 
-function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
 function formatTime(value: string): string {
   return new Date(value).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
@@ -105,9 +101,11 @@ function toDatetimeLocal(value: string | null): string {
   return value.slice(0, 16);
 }
 
-function initials(name: string | null): string {
-  if (!name) return 'System';
-  return name.split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+// A merged group's Coll./Del./Service columns only show one value when every
+// member agrees — otherwise there's no single answer to display, so it falls
+// back to "Mixed" rather than picking one member arbitrarily.
+function commonValue<T>(values: T[]): T | 'Mixed' {
+  return values.every(v => v === values[0]) ? values[0] : 'Mixed';
 }
 
 function pageRangeLabel(job: HawbJob): string | null {
@@ -222,7 +220,7 @@ function ManifestPlaceholderState({ manifest, onBack }: { manifest: HawbManifest
       <h1 className="text-[13px] font-bold text-gray-700 dark:text-navy-200">{manifest.document.filename}</h1>
       {isFailed ? (
         <>
-          <p className="text-[12px] text-gray-400 dark:text-navy-500 max-w-sm">
+          <p className="text-[12px] text-gray-500 dark:text-navy-500 max-w-sm">
             {manifest.remarks ?? 'Extraction failed for this document, so there is nothing to manifest yet.'} Retry to re-process the PDF already on file — no need to resend the email.
           </p>
           <button
@@ -236,7 +234,7 @@ function ManifestPlaceholderState({ manifest, onBack }: { manifest: HawbManifest
           </button>
         </>
       ) : (
-        <p className="text-[12px] text-gray-400 dark:text-navy-500 max-w-sm">
+        <p className="text-[12px] text-gray-500 dark:text-navy-500 max-w-sm">
           Extraction is still in progress — this page will update automatically once it finishes.
         </p>
       )}
@@ -247,7 +245,7 @@ function ManifestPlaceholderState({ manifest, onBack }: { manifest: HawbManifest
 function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[10px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide mb-1.5">{label}</label>
+      <label className="block text-[10px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide mb-1">{label}</label>
       {children}
     </div>
   );
@@ -263,7 +261,7 @@ function Section({
   return (
     <div className="space-y-2.5">
       <div className="flex items-center gap-1.5">
-        <Icon size={12} className="text-gray-400 dark:text-navy-500" />
+        <Icon size={12} className="text-gray-500 dark:text-navy-500" />
         <p className="text-[10px] font-black text-gray-500 dark:text-navy-400 uppercase tracking-wide">{title}</p>
       </div>
       {children}
@@ -272,7 +270,7 @@ function Section({
 }
 
 function inputClass(locked: boolean) {
-  return `w-full text-[13px] border border-gray-200 dark:border-navy-700 rounded-xl px-3 py-2 bg-gray-50/60 dark:bg-navy-800/60 text-gray-700 dark:text-gray-200 focus:outline-none focus:border-emerald-300 dark:focus:border-emerald-600 focus:bg-white dark:focus:bg-navy-800 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/40 transition-all ${
+  return `w-full text-[13px] border border-gray-200 dark:border-navy-700 rounded-xl px-3 py-1.5 bg-gray-50/60 dark:bg-navy-800/60 text-gray-700 dark:text-gray-200 placeholder:text-gray-900 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-300 dark:focus:border-emerald-600 focus:bg-white dark:focus:bg-navy-800 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/40 transition-all ${
     locked ? 'opacity-60 cursor-not-allowed' : ''
   }`;
 }
@@ -313,10 +311,10 @@ function LocationSelect({
         onClick={() => setOpen(o => !o)}
         className={`${inputClass(disabled)} flex items-center justify-between gap-2 text-left ${open ? 'border-emerald-300 dark:border-emerald-600 ring-2 ring-emerald-100 dark:ring-emerald-900/40' : ''}`}
       >
-        <span className={`truncate ${selected ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-navy-500'}`}>
+        <span className={`truncate ${selected ? 'text-gray-700 dark:text-gray-200' : 'text-gray-900 dark:text-navy-500'}`}>
           {selected ? selected.label : placeholder}
         </span>
-        <ChevronDown size={14} className={`text-gray-400 dark:text-navy-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown size={14} className={`text-gray-500 dark:text-navy-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       <AnimatePresence>
@@ -329,7 +327,7 @@ function LocationSelect({
             className="absolute z-20 mt-1.5 w-full max-h-60 overflow-y-auto bg-white dark:bg-navy-800 border border-gray-100 dark:border-navy-700 rounded-xl shadow-lg py-1"
           >
             {options.length === 0 && (
-              <p className="px-3 py-2 text-[12px] text-gray-400 dark:text-navy-500">No locations available</p>
+              <p className="px-3 py-2 text-[12px] text-gray-500 dark:text-navy-500">No locations available</p>
             )}
             {options.map(o => {
               const isSelected = o.value === value;
@@ -361,7 +359,6 @@ type JobServiceType = 'delivery' | 'collection' | 'collection_and_delivery';
 const SERVICE_TYPE_OPTIONS: { value: JobServiceType; label: string; short: string }[] = [
   { value: 'delivery', label: 'Delivery', short: 'Del' },
   { value: 'collection', label: 'Collection', short: 'Coll' },
-  { value: 'collection_and_delivery', label: 'Collection and Delivery', short: 'C&D' },
 ];
 
 function ServiceTypePicker({
@@ -382,7 +379,7 @@ function ServiceTypePicker({
             type="button"
             disabled={disabled}
             onClick={() => onChange(opt.value)}
-            className={`px-1.5 py-1 rounded-md text-[9.5px] font-bold transition-colors whitespace-nowrap ${
+            className={`px-1.5 py-1 rounded-md text-[10px] font-bold transition-colors whitespace-nowrap ${
               value === opt.value
                 ? 'bg-emerald-600 text-white shadow-sm'
                 : 'text-gray-500 dark:text-navy-400 hover:bg-white dark:hover:bg-navy-700'
@@ -455,6 +452,8 @@ export default function ManifestDetailPage() {
   const [syncedJobs, setSyncedJobs] = useState<HawbJob[] | undefined>(undefined);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [runOrderView, setRunOrderView] = useState<'list' | 'merge'>('list');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [jobForm, setJobForm] = useState<JobForm | null>(null);
   const [syncedFormFor, setSyncedFormFor] = useState<string | null>(null);
   const [manifestFields, setManifestFields] = useState({
@@ -531,6 +530,17 @@ export default function ManifestDetailPage() {
   const dgCount = orderedJobs.filter(j => j.dangerous_goods).length;
   const packageCount = orderedJobs.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
   const jobIdsWithUpdates = new Set(jobUpdates.map(u => u.job_id));
+
+  // Groups jobs that share the exact same collection and delivery address — a
+  // driver visiting the same two stops for multiple HAWBs can treat them as one
+  // combined leg. This is purely a display grouping for the "Merge" run-order
+  // view; it never changes the underlying jobs or their order.
+  const routeGroups = new Map<string, HawbJob[]>();
+  for (const job of orderedJobs) {
+    const key = `${job.shipper}→${job.consignee}`;
+    const group = routeGroups.get(key);
+    if (group) group.push(job); else routeGroups.set(key, [job]);
+  }
   const missingExportFields = [
     !manifestFields.job_reference && 'Job reference',
     !manifestFields.account_number && 'Account number',
@@ -612,39 +622,6 @@ export default function ManifestDetailPage() {
     saveJobField(jobId, 'job_service_type', value);
   };
 
-  const swapJobAddresses = async (job: HawbJob) => {
-    if (locked) return;
-    const swapped = {
-      shipper: job.consignee,
-      consignee: job.shipper,
-      shipper_contact: job.consignee_contact,
-      shipper_phone: job.consignee_phone,
-      shipper_reference: job.consignee_reference,
-      consignee_contact: job.shipper_contact,
-      consignee_phone: job.shipper_phone,
-      consignee_reference: job.shipper_reference,
-    };
-    setOrderedJobs(prev => prev.map(j => (j.id === job.id ? { ...j, ...swapped } : j)));
-    if (job.id === selectedJob?.id) {
-      setJobForm(f => f && ({
-        ...f,
-        shipper: swapped.shipper ?? '',
-        consignee: swapped.consignee ?? '',
-        shipper_contact: swapped.shipper_contact ?? '',
-        shipper_phone: swapped.shipper_phone ?? '',
-        shipper_reference: swapped.shipper_reference ?? '',
-        consignee_contact: swapped.consignee_contact ?? '',
-        consignee_phone: swapped.consignee_phone ?? '',
-        consignee_reference: swapped.consignee_reference ?? '',
-      }));
-    }
-    try {
-      await updateJob({ id: job.id, body: swapped }).unwrap();
-    } catch {
-      // reverts to server value on next refetch
-    }
-  };
-
   const handleExport = () => {
     const payload = buildExportPayload(manifest, orderedJobs);
     console.log('[Manifest export payload]', payload);
@@ -677,12 +654,12 @@ export default function ManifestDetailPage() {
   };
 
   return (
-    <motion.div variants={pageTransition} initial="hidden" animate="visible" className="space-y-4">
+    <motion.div variants={pageTransition} initial="hidden" animate="visible" className="space-y-3">
       <motion.div variants={staggerItem} className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <button
             onClick={() => router.push('/dashboard/manifests')}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 dark:text-navy-500 hover:bg-gray-100 dark:hover:bg-navy-800 hover:text-gray-700 dark:hover:text-navy-200 transition-colors mt-0.5 shrink-0"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 dark:text-navy-500 hover:bg-gray-100 dark:hover:bg-navy-800 hover:text-gray-700 dark:hover:text-navy-200 transition-colors mt-0.5 shrink-0"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -709,46 +686,10 @@ export default function ManifestDetailPage() {
                 <FileText size={10} className="shrink-0" />
                 {manifest.document.filename}
               </span>
-              <span className="inline-flex items-center gap-1 text-[10.5px] font-medium px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400">
-                <CalendarDays size={10} className="shrink-0" />
-                Created {formatDate(manifest.created_at)}
-              </span>
-              <span className="inline-flex items-center gap-1 text-[10.5px] font-medium px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400">
-                <User size={10} className="shrink-0" />
-                operator {initials(manifest.created_by_name)}
-              </span>
-              {manifest.exported_at ? (
-                <span className="inline-flex items-center gap-1 text-[10.5px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 size={10} className="shrink-0" />
-                  exported {formatDate(manifest.exported_at)}
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-[10.5px] font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-navy-800 text-gray-500 dark:text-navy-400">
-                  <Clock size={10} className="shrink-0" />
-                  not yet exported
-                </span>
-              )}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {manifest.status === 'open' && !locked && (
-            <Tooltip
-              content={missingExportFields.length > 0 ? `Missing before export: ${missingExportFields.join(', ')}` : undefined}
-              side="bottom"
-            >
-              <button
-                onClick={handleExport}
-                disabled={missingExportFields.length > 0}
-                className="flex items-center gap-1.5 text-[11.5px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-60 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
-              >
-                <span className="flex items-center justify-center w-4 h-4 rounded bg-white/15">
-                  <FileDown size={11} strokeWidth={2.25} />
-                </span>
-                {payloadBuilt ? 'Payload built ✓' : 'Export manifest'}
-              </button>
-            </Tooltip>
-          )}
           {manifest.status === 'open' && !locked && (
             <button
               onClick={() => setShowCancelConfirm(true)}
@@ -761,29 +702,35 @@ export default function ManifestDetailPage() {
               {cancelling ? 'Cancelling…' : 'Cancel manifest'}
             </button>
           )}
+          {manifest.status === 'open' && !locked && (
+            <Tooltip
+              content={missingExportFields.length > 0 ? `Missing before export: ${missingExportFields.join(', ')}` : undefined}
+              side="bottom"
+            >
+              <button
+                onClick={handleExport}
+                disabled={missingExportFields.length > 0}
+                className="flex items-center gap-1.5 text-[11.5px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 disabled:opacity-60 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
+              >
+                <span className="flex items-center justify-center w-4 h-4 rounded bg-emerald-100 dark:bg-emerald-900/40">
+                  <FileDown size={11} strokeWidth={2.25} />
+                </span>
+                {payloadBuilt ? 'Payload built ✓' : 'Export manifest'}
+              </button>
+            </Tooltip>
+          )}
           {manifest.status === 'cancelled' && (
             <button
               onClick={handleReopen}
               disabled={reopening}
-              className="flex items-center gap-1.5 text-[11.5px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-60 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
+              className="flex items-center gap-1.5 text-[11.5px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 disabled:opacity-60 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
             >
-              <span className="flex items-center justify-center w-4 h-4 rounded bg-white/15">
+              <span className="flex items-center justify-center w-4 h-4 rounded bg-emerald-100 dark:bg-emerald-900/40">
                 <RefreshCw size={11} strokeWidth={2.25} />
               </span>
               {reopening ? 'Reopening…' : 'Reopen manifest'}
             </button>
           )}
-          <Tooltip content="View full PDF in a new tab" side="bottom">
-            <button
-              onClick={() => window.open(manifest.pdf_url, '_blank', 'noopener,noreferrer')}
-              className="flex items-center gap-1.5 text-[11.5px] font-semibold text-gray-600 dark:text-navy-300 bg-white dark:bg-navy-900 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-800 hover:text-gray-800 dark:hover:text-navy-100 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
-            >
-              <span className="flex items-center justify-center w-4 h-4 rounded bg-gray-100 dark:bg-navy-800">
-                <FileText size={11} strokeWidth={2.25} />
-              </span>
-              View PDF
-            </button>
-          </Tooltip>
         </div>
       </motion.div>
 
@@ -799,26 +746,43 @@ export default function ManifestDetailPage() {
         onClose={() => setShowCancelConfirm(false)}
       />
 
-      <motion.div variants={staggerItem} className="grid grid-cols-3 gap-3">
+      <motion.div variants={staggerItem} className="grid grid-cols-4 gap-2.5">
         {[
           { label: 'Packages', value: packageCount, icon: PackageIcon, tone: 'text-purple-500 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/30' },
           { label: 'Total weight', value: `${manifest.total_weight_kg.toFixed(2)} kg`, icon: Weight, tone: 'text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30' },
-          { label: 'Dangerous goods', value: dgCount, icon: TriangleAlert, tone: dgCount > 0 ? 'text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/30' : 'text-gray-400 dark:text-navy-500 bg-gray-50 dark:bg-navy-800/60' },
+          { label: 'Dangerous goods', value: dgCount, icon: TriangleAlert, tone: dgCount > 0 ? 'text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/30' : 'text-gray-500 dark:text-navy-500 bg-gray-50 dark:bg-navy-800/60' },
         ].map(stat => (
-          <div key={stat.label} className="flex items-center gap-3 bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-4 py-3">
-            <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${stat.tone}`}>
-              <stat.icon size={15} strokeWidth={2} />
+          <div key={stat.label} className="flex items-center gap-2.5 bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5">
+            <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${stat.tone}`}>
+              <stat.icon size={13} strokeWidth={2} />
             </span>
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-navy-500 uppercase tracking-wide truncate">{stat.label}</p>
-              <p className="text-[15px] font-black text-gray-900 dark:text-gray-100 leading-tight mt-0.5">{stat.value}</p>
+              <p className="text-[10px] font-semibold text-gray-500 dark:text-navy-500 uppercase tracking-wide truncate">{stat.label}</p>
+              <p className="text-[14px] font-black text-gray-900 dark:text-gray-100 leading-tight mt-0.5">{stat.value}</p>
             </div>
           </div>
         ))}
+        <Tooltip content="View full PDF in a new tab" side="bottom" className="block">
+          <button
+            onClick={() => window.open(manifest.pdf_url, '_blank', 'noopener,noreferrer')}
+            className="w-full flex items-center gap-2.5 bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5 hover:bg-gray-50 dark:hover:bg-navy-800 transition-colors text-left"
+          >
+            <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30">
+              <FileText size={13} strokeWidth={2} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold text-gray-500 dark:text-navy-500 uppercase tracking-wide truncate">Document</p>
+              <p className="flex items-center gap-1 text-[14px] font-black text-gray-900 dark:text-gray-100 leading-tight mt-0.5">
+                View PDF
+                <ExternalLink size={11} strokeWidth={2.5} className="text-gray-500 dark:text-navy-500" />
+              </p>
+            </div>
+          </button>
+        </Tooltip>
       </motion.div>
 
-      <motion.div variants={staggerItem} className="grid grid-cols-2 gap-3">
-        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-4 py-3">
+      <motion.div variants={staggerItem} className="grid grid-cols-2 gap-2.5">
+        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5">
           <Field label={<span className="inline-flex items-center gap-1"><Navigation size={10} /> Start point</span>}>
             <LocationSelect
               disabled={locked}
@@ -837,7 +801,7 @@ export default function ManifestDetailPage() {
             />
           </Field>
         </div>
-        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-4 py-3">
+        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5">
           <Field label={<span className="inline-flex items-center gap-1"><Flag size={10} /> End point</span>}>
             <LocationSelect
               disabled={locked}
@@ -853,8 +817,8 @@ export default function ManifestDetailPage() {
         </div>
       </motion.div>
 
-      <motion.div variants={staggerItem} className="grid grid-cols-3 gap-3">
-        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-4 py-3">
+      <motion.div variants={staggerItem} className="grid grid-cols-3 gap-2.5">
+        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5">
           <Field label={<span>Job reference <span className="text-red-500">*</span></span>}>
             <input
               type="text"
@@ -867,7 +831,7 @@ export default function ManifestDetailPage() {
             />
           </Field>
         </div>
-        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-4 py-3">
+        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5">
           <Field label={<span>Account number <span className="text-red-500">*</span></span>}>
             <LocationSelect
               disabled={locked}
@@ -881,7 +845,7 @@ export default function ManifestDetailPage() {
             />
           </Field>
         </div>
-        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-4 py-3">
+        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5">
           <Field label={<span>Vehicle size <span className="text-red-500">*</span></span>}>
             <LocationSelect
               disabled={locked}
@@ -901,15 +865,49 @@ export default function ManifestDetailPage() {
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-navy-800">
           <div>
             <h2 className="text-[12px] font-bold text-gray-700 dark:text-navy-200">Run order</h2>
-            <p className="text-[10.5px] text-gray-400 dark:text-navy-500">
+            <p className="text-[10.5px] text-gray-500 dark:text-navy-500">
               {locked ? 'Manifest is exported and locked' : 'Drag to reorder — click a row to expand its details'}
             </p>
           </div>
+          <div className="inline-flex items-center rounded-lg border border-gray-200 dark:border-navy-700 bg-gray-50/70 dark:bg-navy-800/60 p-0.5 gap-0.5 shrink-0">
+            <Tooltip content="One row per HAWB" side="bottom">
+              <button
+                type="button"
+                onClick={() => setRunOrderView('list')}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-bold transition-colors ${
+                  runOrderView === 'list'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-gray-500 dark:text-navy-400 hover:bg-white dark:hover:bg-navy-700'
+                }`}
+              >
+                <List size={12} strokeWidth={2.25} />
+                List
+              </button>
+            </Tooltip>
+            <Tooltip content="Group HAWBs that share the same collection and delivery address" side="bottom">
+              <button
+                type="button"
+                onClick={() => setRunOrderView('merge')}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-bold transition-colors ${
+                  runOrderView === 'merge'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-gray-500 dark:text-navy-400 hover:bg-white dark:hover:bg-navy-700'
+                }`}
+              >
+                <Combine size={12} strokeWidth={2.25} />
+                Merge
+              </button>
+            </Tooltip>
+          </div>
         </div>
 
-        <div className="grid grid-cols-[24px_1fr_56px_56px_44px_50px_112px] gap-2 px-4 py-2 text-[9px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
+        <div className="overflow-x-auto">
+        <div className="min-w-[920px]">
+        <div className="grid grid-cols-[24px_190px_1fr_1fr_56px_56px_44px_50px_112px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
           <span>#</span>
-          <span>HAWB · Route</span>
+          <span>HAWB</span>
+          <span>From</span>
+          <span>To</span>
           <span className="text-right">Coll.</span>
           <span className="text-right">Del.</span>
           <span className="text-right">Pkg</span>
@@ -918,14 +916,81 @@ export default function ManifestDetailPage() {
         </div>
 
         <div className="divide-y divide-gray-50 dark:divide-navy-800/70">
-          {orderedJobs.map((job, index) => {
+          {(() => { let mergeRowCounter = 0; return orderedJobs.map((job, index) => {
             const selected = selectedJobId === job.id;
             const pages = pageRangeLabel(job);
             const jobMultiPackage = job.packages.length > 1;
             const jobPackagesHaveDetail = job.packages.some(p => p.temperature_range || p.dimensions);
             const jobShowCombinedTempDims = !jobMultiPackage || !jobPackagesHaveDetail;
+            const groupKey = `${job.shipper}→${job.consignee}`;
+            const routeGroup = routeGroups.get(groupKey) ?? [job];
+            const isGroupParent = runOrderView === 'merge' && routeGroup.length > 1;
+            const isFirstInGroup = isGroupParent && routeGroup[0].id === job.id;
+            const groupExpanded = expandedGroups.has(groupKey);
+
+            // Non-first members of a collapsed group are represented entirely by
+            // the group summary row below — they don't get a row of their own
+            // until the group is expanded.
+            if (isGroupParent && !isFirstInGroup && !groupExpanded) return null;
+
+            // A merged group occupies exactly one slot in the run order regardless
+            // of whether it's expanded — expanding it to inspect the individual
+            // HAWBs shouldn't renumber every stop after it.
+            if (!isGroupParent || isFirstInGroup) mergeRowCounter += 1;
+            const rowNumber = mergeRowCounter;
+
+            if (isGroupParent && !groupExpanded) {
+              const collTimes = routeGroup.map(j => j.collection_at ? formatTime(j.collection_at) : '—');
+              const delTimes = routeGroup.map(j => j.delivery_at ? formatTime(j.delivery_at) : '—');
+              const services = routeGroup.map(j => j.job_service_type ?? '');
+              const totalPkg = routeGroup.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
+              const totalWt = routeGroup.reduce((sum, j) => sum + (j.weight_kg ?? 0), 0);
+              return (
+                <div key={groupKey}>
+                  <div
+                    onClick={() => setExpandedGroups(prev => new Set(prev).add(groupKey))}
+                    className="grid grid-cols-[24px_190px_1fr_1fr_56px_56px_44px_50px_112px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25"
+                  >
+                    <span className="text-gray-900 dark:text-gray-100 font-mono">{rowNumber}</span>
+                    <div className="min-w-0 flex items-center gap-1.5">
+                      <ChevronDown size={11} className="text-blue-400 dark:text-blue-500 shrink-0 -rotate-90" />
+                      <Combine size={11} className="text-blue-500 dark:text-blue-400 shrink-0" />
+                      <span className="font-bold text-blue-700 dark:text-blue-400 truncate">{routeGroup.length} HAWBs merged</span>
+                    </div>
+                    <span className="inline-flex items-center gap-0.5 min-w-0">
+                      <MapPin size={9} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
+                      <span className="text-gray-900 dark:text-gray-100 truncate">
+                        {[splitAddress(job.shipper).name, cityLine(job.shipper)].filter(Boolean).join(' · ') || '—'}
+                      </span>
+                    </span>
+                    <span className="inline-flex items-center gap-0.5 min-w-0">
+                      <Building2 size={9} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
+                      <span className="text-gray-900 dark:text-gray-100 truncate">
+                        {[splitAddress(job.consignee).name, cityLine(job.consignee)].filter(Boolean).join(' · ') || '—'}
+                      </span>
+                    </span>
+                    <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{commonValue(collTimes)}</span>
+                    <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{commonValue(delTimes)}</span>
+                    <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{totalPkg}</span>
+                    <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{totalWt}</span>
+                    <div className="flex justify-end">
+                      {(() => {
+                        const svc = commonValue(services);
+                        const opt = SERVICE_TYPE_OPTIONS.find(o => o.value === svc);
+                        return (
+                          <span className="text-[10px] font-bold text-gray-500 dark:text-navy-400 whitespace-nowrap">
+                            {opt ? opt.short : 'Mixed'}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
             const dragProps = {
-              draggable: !locked,
+              draggable: !locked && runOrderView === 'list',
               onDragStart: () => setDragIndex(index),
               onDragOver: (e: React.DragEvent) => { e.preventDefault(); handleDragOver(index); },
               onDrop: handleDrop,
@@ -934,52 +999,50 @@ export default function ManifestDetailPage() {
 
             return (
               <div key={job.id}>
+                {isGroupParent && isFirstInGroup && groupExpanded && (
+                  <div
+                    onClick={() => setExpandedGroups(prev => { const next = new Set(prev); next.delete(groupKey); return next; })}
+                    className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-50/70 dark:bg-blue-950/20 text-[10.5px] font-semibold text-blue-700 dark:text-blue-400 cursor-pointer hover:bg-blue-100/70 dark:hover:bg-blue-950/40"
+                  >
+                    <span className="font-mono">{rowNumber}</span>
+                    <Combine size={11} strokeWidth={2.25} className="shrink-0" />
+                    {routeGroup.length} HAWBs share this route — click to collapse
+                  </div>
+                )}
                 <div
                   {...dragProps}
-                  className={`grid grid-cols-[24px_1fr_56px_56px_44px_50px_112px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[11px] transition-colors ${
+                  className={`grid grid-cols-[24px_190px_1fr_1fr_56px_56px_44px_50px_112px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
+                    isGroupParent ? 'bg-blue-50/25 dark:bg-blue-950/10' : ''
+                  } ${
                     selected ? 'bg-emerald-50/70 dark:bg-emerald-950/25' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
                   }`}
                 >
-                  <span className="text-gray-400 dark:text-navy-500 font-mono text-[10px]">{index + 1}</span>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <ChevronDown size={11} className={`text-gray-300 dark:text-navy-600 shrink-0 transition-transform ${selected ? 'rotate-0' : '-rotate-90'}`} />
-                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{job.hawb_number}</span>
-                      <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-blue-500 dark:text-blue-400 shrink-0">
-                        <FileText size={10} />{pages ?? 'Page 1'}
-                      </span>
-                      {job.dangerous_goods_notes && <TriangleAlert size={10} className="text-red-500 shrink-0" />}
-                      {jobIdsWithUpdates.has(job.id) && <RefreshCw size={10} className="text-orange-500 shrink-0" />}
-                    </div>
-                    <div className="flex items-center gap-1 mt-0.5 pl-[17px] min-w-0">
-                      <span className="inline-flex items-center gap-0.5 min-w-0 flex-1">
-                        <MapPin size={9} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
-                        <span className="text-gray-400 dark:text-navy-500 text-[10px] truncate">
-                          {[splitAddress(job.shipper).name, cityLine(job.shipper)].filter(Boolean).join(' · ') || '—'}
-                        </span>
-                      </span>
-                      <Tooltip content="Swap shipper and consignee" side="bottom">
-                        <button
-                          type="button"
-                          onClick={e => { e.stopPropagation(); swapJobAddresses(job); }}
-                          disabled={locked}
-                          className="shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                        >
-                          <ArrowLeftRight size={9} />
-                        </button>
-                      </Tooltip>
-                      <span className="inline-flex items-center gap-0.5 min-w-0 flex-1">
-                        <Building2 size={9} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
-                        <span className="text-gray-400 dark:text-navy-500 text-[10px] truncate">
-                          {[splitAddress(job.consignee).name, cityLine(job.consignee)].filter(Boolean).join(' · ') || '—'}
-                        </span>
-                      </span>
-                    </div>
+                  <span className="text-gray-900 dark:text-gray-100 font-mono">{isGroupParent && groupExpanded ? '' : rowNumber}</span>
+                  <div className="min-w-0 flex items-center gap-1.5">
+                    <ChevronDown size={11} className={`text-gray-300 dark:text-navy-600 shrink-0 transition-transform ${selected ? 'rotate-0' : '-rotate-90'}`} />
+                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 truncate">{job.hawb_number}</span>
+                    <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-500 dark:text-blue-400 shrink-0">
+                      <FileText size={10} />{pages ?? 'Page 1'}
+                    </span>
+                    {job.dangerous_goods_notes && <TriangleAlert size={10} className="text-red-500 shrink-0" />}
+                    {jobIdsWithUpdates.has(job.id) && <RefreshCw size={10} className="text-orange-500 shrink-0" />}
                   </div>
-                  <span className="text-gray-600 dark:text-navy-300 text-right tabular-nums">{job.collection_at ? formatTime(job.collection_at) : '—'}</span>
-                  <span className="text-gray-400 dark:text-navy-500 text-right tabular-nums">{job.delivery_at ? formatTime(job.delivery_at) : '—'}</span>
-                  <span className="text-gray-400 dark:text-navy-500 text-right tabular-nums">{job.package_qty ?? '—'}</span>
-                  <span className="text-gray-400 dark:text-navy-500 text-right tabular-nums">{job.weight_kg ?? '—'}</span>
+                  <span className="inline-flex items-center gap-0.5 min-w-0">
+                    <MapPin size={9} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
+                    <span className="text-gray-900 dark:text-gray-100 truncate">
+                      {[splitAddress(job.shipper).name, cityLine(job.shipper)].filter(Boolean).join(' · ') || '—'}
+                    </span>
+                  </span>
+                  <span className="inline-flex items-center gap-0.5 min-w-0">
+                    <Building2 size={9} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
+                    <span className="text-gray-900 dark:text-gray-100 truncate">
+                      {[splitAddress(job.consignee).name, cityLine(job.consignee)].filter(Boolean).join(' · ') || '—'}
+                    </span>
+                  </span>
+                  <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{job.collection_at ? formatTime(job.collection_at) : '—'}</span>
+                  <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{job.delivery_at ? formatTime(job.delivery_at) : '—'}</span>
+                  <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{job.package_qty ?? '—'}</span>
+                  <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{job.weight_kg ?? '—'}</span>
                   <div className="flex justify-end">
                     <ServiceTypePicker
                       value={job.job_service_type ?? ''}
@@ -1129,7 +1192,7 @@ export default function ManifestDetailPage() {
 
                         {/* Additional details panel */}
                         <div className="rounded-xl border border-gray-100 dark:border-navy-800 bg-white dark:bg-navy-900 p-4 space-y-5">
-                          <p className="text-[10.5px] font-black text-gray-400 dark:text-navy-500 uppercase tracking-wide">Additional details</p>
+                          <p className="text-[10.5px] font-black text-gray-500 dark:text-navy-500 uppercase tracking-wide">Additional details</p>
 
                           <Section icon={Hash} title="References">
                             <div className="space-y-3">
@@ -1272,19 +1335,19 @@ export default function ManifestDetailPage() {
                                   <table className="w-full text-[11.5px] border-collapse">
                                     <thead>
                                       <tr className="bg-gray-50/80 dark:bg-navy-800/80">
-                                        <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2 w-7">#</th>
-                                        <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Supplier</th>
-                                        <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Type</th>
-                                        <th className="text-right font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Weight</th>
-                                        <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Temp</th>
-                                        <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Dims (cm)</th>
-                                        <th className="text-left font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Description</th>
+                                        <th className="text-left font-bold text-gray-500 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2 w-7">#</th>
+                                        <th className="text-left font-bold text-gray-500 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Supplier</th>
+                                        <th className="text-left font-bold text-gray-500 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Type</th>
+                                        <th className="text-right font-bold text-gray-500 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Weight</th>
+                                        <th className="text-left font-bold text-gray-500 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Temp</th>
+                                        <th className="text-left font-bold text-gray-500 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Dims (cm)</th>
+                                        <th className="text-left font-bold text-gray-500 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Description</th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-navy-800">
                                       {job.packages.map((p, i) => (
                                         <tr key={i} className="bg-white dark:bg-navy-900 even:bg-gray-50/40 dark:even:bg-navy-800/30">
-                                          <td className="px-3 py-2 text-gray-400 dark:text-navy-500 font-bold">{i + 1}</td>
+                                          <td className="px-3 py-2 text-gray-500 dark:text-navy-500 font-bold">{i + 1}</td>
                                           <td className="px-3 py-2 text-gray-700 dark:text-navy-300 whitespace-nowrap">{p.supplier || '—'}</td>
                                           <td className="px-3 py-2 text-gray-700 dark:text-navy-300 whitespace-nowrap">{p.package_type || '—'}</td>
                                           <td className="px-3 py-2 text-gray-700 dark:text-navy-300 text-right whitespace-nowrap">{p.weight_kg != null ? `${p.weight_kg} kg` : '—'}</td>
@@ -1306,7 +1369,9 @@ export default function ManifestDetailPage() {
                 </AnimatePresence>
               </div>
             );
-          })}
+          }); })()}
+        </div>
+        </div>
         </div>
 
       </motion.div>
