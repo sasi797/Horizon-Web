@@ -21,7 +21,7 @@ import {
 import ApiErrorState from '@/components/ApiErrorState';
 import Tooltip from '@/components/Tooltip';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import { splitAddress, cityLine } from '@/lib/hawbFormat';
+import { splitAddress, cityLine, cityAndPostcodeLine } from '@/lib/hawbFormat';
 
 const MANIFEST_STATUS_BADGE: Record<string, string> = {
   pending_review: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
@@ -61,39 +61,171 @@ const VEHICLE_SIZE_OPTIONS = [
   { value: 'long_wheel_base', label: 'Long wheel base' },
 ];
 
-// Shape of what would eventually be POSTed to the external booking system.
-// External API integration is on hold pending their docs (single job / bulk /
-// both, auth, response contract) — for now this is built and downloaded
-// locally so the field mapping can be reviewed before any call is wired up.
-function buildExportPayload(manifest: HawbManifestDetail, jobs: HawbJob[]) {
+// Indigo's real ServiceType codes for the AddJob payload.
+const INDIGO_SERVICE_TYPE_OPTIONS = [
+  { value: 'Sameday', label: 'Sameday' },
+  { value: 'Overnight Parcels', label: 'Overnight Parcels' },
+];
+
+// Manifest-level fields Indigo's AddJob needs that we don't have a home for
+// yet — captured locally on this page only (see indigoFields state) since
+// the backend's HawbManifestUpdate type doesn't have columns for these.
+// ServiceType/VehicleType stay free-text inputs until Indigo hands over
+// their real code lists; at that point these become dropdowns.
+type IndigoFields = {
+  service_type: string;
+};
+
+// Matches formatTime()'s approach below: these timestamps are stored and
+// displayed as literal wall-clock strings everywhere else in this app, never
+// timezone-converted. Parsing through `new Date()` + local getters here would
+// silently shift the hour by the browser's UTC offset — extract the
+// components directly from the string instead, same as the display does.
+function toIndigoDateTime(value: string | null): string {
+  if (!value) return '';
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) return '';
+  const [, year, month, day, hour, minute, second = '00'] = match;
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}.000`;
+}
+
+// Per the Indigo docs: the X-Indigo-Access-Token header value is
+// Base64("username:password").
+function buildIndigoAccessToken(username: string, password: string): string {
+  if (!username || !password) return '';
+  return btoa(`${username}:${password}`);
+}
+
+// SPLTEST sandbox account, provided by Indigo/NPA for testing this
+// integration — NOT a production credential, but real enough to log a
+// genuinely correct url/token pair on every Export click without retyping
+// horizonIndigoRequest(...) in the console each time. Remove/replace before
+// this ever points at a live account.
+const INDIGO_TEST_CONNECTION = {
+  baseUrl: 'https://apps.neilporterassociates.co.uk/iWebService/V1',
+  username: 'SPLTEST',
+  password: 'SPLTest123!',
+};
+
+// cityLine() falls back to '—' for missing data — fine for on-screen display,
+// but that placeholder has no business ending up in an API payload.
+function addressCountry(value: string | null): string {
+  const line = cityLine(value);
+  return line === '—' ? '' : line;
+}
+
+// job.dimensions is free-text from PDF extraction (e.g. "30 x 20 x 15 cm"),
+// not three separate numbers — pull out up to three numbers in order.
+function parseDimensions(value: string | null): [number, number, number] {
+  const nums = value?.match(/\d+(\.\d+)?/g)?.map(Number) ?? [];
+  return [nums[0] ?? 0, nums[1] ?? 0, nums[2] ?? 0];
+}
+
+// Shape expected by Indigo's iWebService/V1/AddJob endpoint (see
+// "NPA Indigo Cloud API Integration" doc, and docs/indigo-addjob-integration.md
+// for the full field-by-field mapping notes). Auth (X-Indigo-Access-Token),
+// the live URL, and the ServiceType/VehicleType code lists still have to
+// come from the client before this can actually be POSTed — until then this
+// is built and downloaded locally so the field mapping can be reviewed.
+//
+// Remaining known gaps:
+// - ColAddress1 / DelAddress1: our shipper/consignee are single free-text
+//   blobs (from PDF extraction), not structured fields, so everything past
+//   the company name goes into Address1 as one string rather than being
+//   split across Address1-3 — long addresses risk exceeding Indigo's
+//   35-char limit there.
+// - ColTown / DelTown / ColPostcode / DelPostcode: parsed via
+//   cityAndPostcodeLine() off the "Town, Postcode" line that sits just
+//   before the country line — works for the address shapes seen so far, but
+//   isn't guaranteed for every format PDF extraction might produce.
+// - Dangerous goods: Indigo's schema has no hazmat/DG field at all, so
+//   job.dangerous_goods currently has nowhere to go in this payload.
+// - Merged groups (same collection+delivery route — see the "Merge" run-order
+//   view): Indigo's AddJob has no concept of "one job, many consignments", so
+//   a merged group becomes ONE Job with summed Packs/Weight. JobReference and
+//   ConsignmentNo can only hold one value each (STRING(35)/STRING(25)), so
+//   they carry the first HAWB in the group.
+function buildIndigoAddJobPayload(
+  indigoFields: IndigoFields,
+  manifestFields: { account_number: string; vehicle_size: string },
+  jobGroups: HawbJob[][],
+) {
   return {
-    manifest_reference: manifest.reference_number,
-    job_reference: manifest.job_reference,
-    account_number: manifest.account_number,
-    vehicle_size: manifest.vehicle_size,
-    start_point: manifest.start_point,
-    end_point: manifest.end_point,
-    jobs: jobs.map((job, index) => ({
-      sequence: index + 1,
-      hawb_number: job.hawb_number,
-      service_type: job.job_service_type,
-      shipper: job.shipper,
-      consignee: job.consignee,
-      collection_at: job.collection_at,
-      delivery_at: job.delivery_at,
-      package_qty: job.package_qty,
-      weight_kg: job.weight_kg,
-      dangerous_goods: job.dangerous_goods,
-      dangerous_goods_notes: job.dangerous_goods_notes,
-      temperature_range: job.temperature_range,
-      dimensions: job.dimensions,
-      special_handling: job.special_handling,
-    })),
+    Jobs: {
+      Job: jobGroups.map(group => {
+        const job = group[0];
+        const [length, width, height] = parseDimensions(job.dimensions);
+        const colCityPostcode = cityAndPostcodeLine(job.shipper);
+        const delCityPostcode = cityAndPostcodeLine(job.consignee);
+        const totalPacks = group.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
+        const totalWeight = group.reduce((sum, j) => sum + (j.weight_kg ?? 0), 0);
+        const specialInsts = [...new Set(group.map(j => j.special_handling).filter(Boolean))].join(' — ');
+        return {
+          JobGuid: crypto.randomUUID().replace(/-/g, ''),
+          // Account number / vehicle size are the same value the manifest
+          // already collects (see the "Account number" / "Vehicle size"
+          // fields above) — no separate Indigo-specific input for these.
+          CustomerNumber: manifestFields.account_number,
+          ServiceType: indigoFields.service_type,
+          VehicleType: manifestFields.vehicle_size,
+          JobReference: job.hawb_number,
+          JobReference2: '',
+          BookedBy: '',
+          RequestedBy: 'Horizon Web',
+          ColDateTime: toIndigoDateTime(job.collection_at),
+          ColCompany: splitAddress(job.shipper).name,
+          ColContact: job.shipper_contact ?? '',
+          ColAddress1: splitAddress(job.shipper).address,
+          ColAddress2: '',
+          ColAddress3: '',
+          ColTown: colCityPostcode.town,
+          ColPostcode: colCityPostcode.postcode,
+          ColCountry: addressCountry(job.shipper),
+          ColTelephone: job.shipper_phone ?? '',
+          ColEmail: '',
+          ColInsts: '',
+          ColReadyAt: '',
+          ColPremisesClose: '',
+          DelDateTime: toIndigoDateTime(job.delivery_at),
+          DelCompany: splitAddress(job.consignee).name,
+          DelContact: job.consignee_contact ?? '',
+          DelAddress1: splitAddress(job.consignee).address,
+          DelAddress2: '',
+          DelAddress3: '',
+          DelTown: delCityPostcode.town,
+          DelPostcode: delCityPostcode.postcode,
+          DelCountry: addressCountry(job.consignee),
+          DelTelephone: job.consignee_phone ?? '',
+          DelInsts: '',
+          DelReadyAt: '',
+          DelPremisesClose: '',
+          Packs: totalPacks,
+          Weight: totalWeight,
+          SpecialInsts: specialInsts,
+          Length: length,
+          Width: width,
+          Height: height,
+          Fragile: 0,
+          Security: 0,
+          ConsignmentNo: job.hawb_number,
+          Insurance: 0,
+          InsuranceValue: 0,
+        };
+      }),
+    },
   };
 }
 
+// collection_at/delivery_at are wall-clock times extracted from the HAWB PDF,
+// stored with a fake UTC tag purely to fit a timestamptz column (see
+// hawb_ingest._parse_dt) — they aren't real UTC instants. Reading the digits
+// straight out of the ISO string keeps this in sync with toDatetimeLocal
+// below and avoids the browser silently "converting" to its local timezone.
 function formatTime(value: string): string {
-  return new Date(value).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!match) return '—';
+  const [, year, month, day, hour, minute] = match;
+  return `${day}/${month}/${year} ${hour}:${minute}`;
 }
 
 function toDatetimeLocal(value: string | null): string {
@@ -270,7 +402,7 @@ function Section({
 }
 
 function inputClass(locked: boolean) {
-  return `w-full text-[13px] border border-gray-200 dark:border-navy-700 rounded-xl px-3 py-1.5 bg-gray-50/60 dark:bg-navy-800/60 text-gray-700 dark:text-gray-200 placeholder:text-gray-900 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-300 dark:focus:border-emerald-600 focus:bg-white dark:focus:bg-navy-800 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/40 transition-all ${
+  return `w-full text-[13px] border border-gray-200 dark:border-navy-700 rounded-xl px-3 py-1.5 bg-gray-50/60 dark:bg-navy-800/60 text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-300 dark:focus:border-emerald-600 focus:bg-white dark:focus:bg-navy-800 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/40 transition-all ${
     locked ? 'opacity-60 cursor-not-allowed' : ''
   }`;
 }
@@ -311,7 +443,7 @@ function LocationSelect({
         onClick={() => setOpen(o => !o)}
         className={`${inputClass(disabled)} flex items-center justify-between gap-2 text-left ${open ? 'border-emerald-300 dark:border-emerald-600 ring-2 ring-emerald-100 dark:ring-emerald-900/40' : ''}`}
       >
-        <span className={`truncate ${selected ? 'text-gray-700 dark:text-gray-200' : 'text-gray-900 dark:text-navy-500'}`}>
+        <span className={`truncate ${selected ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-navy-500'}`}>
           {selected ? selected.label : placeholder}
         </span>
         <ChevronDown size={14} className={`text-gray-500 dark:text-navy-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -460,6 +592,9 @@ export default function ManifestDetailPage() {
     start_point: '', end_point: '', job_reference: '', account_number: '', vehicle_size: '',
   });
   const [syncedPointsFor, setSyncedPointsFor] = useState<string | undefined>(undefined);
+  // Indigo AddJob fields with no backend column yet — local to this page only,
+  // so they reset on reload until the backend adds real storage for them.
+  const [indigoFields, setIndigoFields] = useState<IndigoFields>({ service_type: 'Sameday' });
 
   // Auto-apply pending blind-companion/duplicate merges as soon as they're seen —
   // no manual "Apply" click needed. Already-exported (locked) jobs are the one
@@ -513,6 +648,54 @@ export default function ManifestDetailPage() {
     }
   }, [selectedJob, syncedFormFor]);
 
+  // Groups jobs that share the exact same collection and delivery address — a
+  // driver visiting the same two stops for multiple HAWBs can treat them as one
+  // combined leg. This is purely a display grouping for the "Merge" run-order
+  // view; it never changes the underlying jobs or their order. Computed here
+  // (before the loading/error early returns below) because the useEffect that
+  // depends on it must itself be called unconditionally on every render — a
+  // hook placed after an early return gets skipped on some renders and not
+  // others, which is exactly what triggered "Rendered more hooks than during
+  // the previous render" when this lived further down.
+  const routeGroups = new Map<string, HawbJob[]>();
+  for (const job of orderedJobs) {
+    const key = `${job.shipper}→${job.consignee}`;
+    const group = routeGroups.get(key);
+    if (group) group.push(job); else routeGroups.set(key, [job]);
+  }
+
+  // Deliberately not a form on the page — credentials shouldn't sit in
+  // rendered UI/React state for something that isn't wired up to a real call
+  // yet. Instead, exposed as a console-only function: run
+  // horizonIndigoRequest(baseUrl, username, password) in DevTools to build
+  // and log the exact request (URL + auth header + body) for review/sign-off
+  // before anyone connects a live fetch. Still never sends anything.
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>).horizonIndigoRequest = (baseUrl: string, username: string, password: string) => {
+      const jobGroups = Array.from(routeGroups.values());
+      const payload = buildIndigoAddJobPayload(indigoFields, manifestFields, jobGroups);
+      const url = `${baseUrl.replace(/\/+$/, '')}/AddJob`;
+      const token = buildIndigoAccessToken(username, password);
+      const request = {
+        method: 'POST',
+        url,
+        headers: {
+          'X-Indigo-Access-Token': token,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: payload,
+      };
+      // Three separate labeled lines — easier to read/screenshot for review
+      // than one nested object.
+      console.log('payload:', payload);
+      console.log('url:', url);
+      console.log('token:', token);
+      return request;
+    };
+    return () => { delete (window as unknown as Record<string, unknown>).horizonIndigoRequest; };
+  }, [indigoFields, manifestFields, routeGroups]);
+
   if (isLoading) {
     return <ManifestDetailSkeleton />;
   }
@@ -530,21 +713,11 @@ export default function ManifestDetailPage() {
   const dgCount = orderedJobs.filter(j => j.dangerous_goods).length;
   const packageCount = orderedJobs.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
   const jobIdsWithUpdates = new Set(jobUpdates.map(u => u.job_id));
-
-  // Groups jobs that share the exact same collection and delivery address — a
-  // driver visiting the same two stops for multiple HAWBs can treat them as one
-  // combined leg. This is purely a display grouping for the "Merge" run-order
-  // view; it never changes the underlying jobs or their order.
-  const routeGroups = new Map<string, HawbJob[]>();
-  for (const job of orderedJobs) {
-    const key = `${job.shipper}→${job.consignee}`;
-    const group = routeGroups.get(key);
-    if (group) group.push(job); else routeGroups.set(key, [job]);
-  }
   const missingExportFields = [
     !manifestFields.job_reference && 'Job reference',
     !manifestFields.account_number && 'Account number',
     !manifestFields.vehicle_size && 'Vehicle size',
+    !indigoFields.service_type && 'Service type',
   ].filter((v): v is string => Boolean(v));
 
   // Start/end point pickers offer the collection & delivery addresses already present on
@@ -623,8 +796,17 @@ export default function ManifestDetailPage() {
   };
 
   const handleExport = () => {
-    const payload = buildExportPayload(manifest, orderedJobs);
-    console.log('[Manifest export payload]', payload);
+    // Same-route jobs (see routeGroups, used by the "Merge" run-order view)
+    // collapse into one Indigo Job on export — that's a fact about the
+    // physical run, not a display preference, so it applies regardless of
+    // whether List or Merge view happens to be selected right now.
+    const jobGroups = Array.from(routeGroups.values());
+    const payload = buildIndigoAddJobPayload(indigoFields, manifestFields, jobGroups);
+    const requestUrl = `${INDIGO_TEST_CONNECTION.baseUrl.replace(/\/+$/, '')}/AddJob`;
+    const requestToken = buildIndigoAccessToken(INDIGO_TEST_CONNECTION.username, INDIGO_TEST_CONNECTION.password);
+    console.log('payload:', payload);
+    console.log('url:', requestUrl);
+    console.log('token:', requestToken);
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -764,7 +946,19 @@ export default function ManifestDetailPage() {
         ))}
         <Tooltip content="View full PDF in a new tab" side="bottom" className="block">
           <button
-            onClick={() => window.open(manifest.pdf_url, '_blank', 'noopener,noreferrer')}
+            onClick={async () => {
+              // pdf_url is a presigned S3 link that expires after an hour — the
+              // cached copy may be stale if this tab has been open a while, so
+              // open the tab immediately (to keep the user gesture) then point
+              // it at a freshly refetched URL once available.
+              const pdfWindow = window.open('', '_blank');
+              try {
+                const fresh = await refetch().unwrap();
+                if (pdfWindow) pdfWindow.location.href = fresh.pdf_url;
+              } catch {
+                if (pdfWindow) pdfWindow.location.href = manifest.pdf_url;
+              }
+            }}
             className="w-full flex items-center gap-2.5 bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5 hover:bg-gray-50 dark:hover:bg-navy-800 transition-colors text-left"
           >
             <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30">
@@ -787,7 +981,7 @@ export default function ManifestDetailPage() {
             <LocationSelect
               disabled={locked}
               value={manifestFields.start_point}
-              placeholder="Collection start location"
+              placeholder="Select collection start location..."
               options={withCurrentValue(startOptions, manifestFields.start_point)}
               onChange={value => {
                 const match = startOptions.find(o => o.value === value);
@@ -806,7 +1000,7 @@ export default function ManifestDetailPage() {
             <LocationSelect
               disabled={locked}
               value={manifestFields.end_point}
-              placeholder="Final delivery location"
+              placeholder="Select final delivery location..."
               options={withCurrentValue(endOptions, manifestFields.end_point)}
               onChange={value => {
                 setManifestFields(f => ({ ...f, end_point: value }));
@@ -817,26 +1011,13 @@ export default function ManifestDetailPage() {
         </div>
       </motion.div>
 
-      <motion.div variants={staggerItem} className="grid grid-cols-3 gap-2.5">
-        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5">
-          <Field label={<span>Job reference <span className="text-red-500">*</span></span>}>
-            <input
-              type="text"
-              disabled={locked}
-              value={manifestFields.job_reference}
-              placeholder="e.g. JR-10234"
-              onChange={e => setManifestFields(f => ({ ...f, job_reference: e.target.value }))}
-              onBlur={e => saveManifestField('job_reference', e.target.value)}
-              className={inputClass(locked)}
-            />
-          </Field>
-        </div>
-        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5">
+      <motion.div variants={staggerItem} className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm overflow-hidden">
+        <div className="grid grid-cols-4 gap-4 p-4">
           <Field label={<span>Account number <span className="text-red-500">*</span></span>}>
             <LocationSelect
               disabled={locked}
               value={manifestFields.account_number}
-              placeholder="Select account number"
+              placeholder="Select account number..."
               options={withCurrentValue(ACCOUNT_NUMBER_OPTIONS, manifestFields.account_number)}
               onChange={value => {
                 setManifestFields(f => ({ ...f, account_number: value }));
@@ -844,18 +1025,36 @@ export default function ManifestDetailPage() {
               }}
             />
           </Field>
-        </div>
-        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5">
+          <Field label={<span>Service type <span className="text-red-500">*</span></span>}>
+            <LocationSelect
+              disabled={locked}
+              value={indigoFields.service_type}
+              placeholder="Select service type..."
+              options={withCurrentValue(INDIGO_SERVICE_TYPE_OPTIONS, indigoFields.service_type)}
+              onChange={value => setIndigoFields(f => ({ ...f, service_type: value }))}
+            />
+          </Field>
           <Field label={<span>Vehicle size <span className="text-red-500">*</span></span>}>
             <LocationSelect
               disabled={locked}
               value={manifestFields.vehicle_size}
-              placeholder="Select vehicle size"
+              placeholder="Select vehicle size..."
               options={withCurrentValue(VEHICLE_SIZE_OPTIONS, manifestFields.vehicle_size)}
               onChange={value => {
                 setManifestFields(f => ({ ...f, vehicle_size: value }));
                 saveManifestField('vehicle_size', value);
               }}
+            />
+          </Field>
+          <Field label={<span>Job reference <span className="text-red-500">*</span></span>}>
+            <input
+              type="text"
+              disabled={locked}
+              value={manifestFields.job_reference}
+              placeholder="Enter job reference..."
+              onChange={e => setManifestFields(f => ({ ...f, job_reference: e.target.value }))}
+              onBlur={e => saveManifestField('job_reference', e.target.value)}
+              className={inputClass(locked)}
             />
           </Field>
         </div>
@@ -902,17 +1101,19 @@ export default function ManifestDetailPage() {
         </div>
 
         <div className="overflow-x-auto">
-        <div className="min-w-[920px]">
-        <div className="grid grid-cols-[24px_190px_1fr_1fr_56px_56px_44px_50px_112px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
-          <span>#</span>
-          <span>HAWB</span>
-          <span>From</span>
+        <div className="min-w-[1320px]">
+        <div className="grid grid-cols-[24px_190px_260px_260px_140px_140px_60px_70px_90px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
+          <div className="col-span-2 sticky left-0 z-10 -ml-4 pl-4 bg-white dark:bg-navy-900 grid grid-cols-[24px_190px] gap-2">
+            <span>#</span>
+            <span>HAWB</span>
+          </div>
+          <span className="pl-2">From</span>
           <span>To</span>
-          <span className="text-right">Coll.</span>
-          <span className="text-right">Del.</span>
-          <span className="text-right">Pkg</span>
-          <span className="text-right">Wt (kg)</span>
-          <span className="text-right">Service</span>
+          <span>Coll.</span>
+          <span>Del.</span>
+          <span>Pkg</span>
+          <span>Wt (kg)</span>
+          <span>Service</span>
         </div>
 
         <div className="divide-y divide-gray-50 dark:divide-navy-800/70">
@@ -949,15 +1150,26 @@ export default function ManifestDetailPage() {
                 <div key={groupKey}>
                   <div
                     onClick={() => setExpandedGroups(prev => new Set(prev).add(groupKey))}
-                    className="grid grid-cols-[24px_190px_1fr_1fr_56px_56px_44px_50px_112px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25"
+                    className="grid grid-cols-[24px_190px_260px_260px_140px_140px_60px_70px_90px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25"
                   >
-                    <span className="text-gray-900 dark:text-gray-100 font-mono">{rowNumber}</span>
-                    <div className="min-w-0 flex items-center gap-1.5">
-                      <ChevronDown size={11} className="text-blue-400 dark:text-blue-500 shrink-0 -rotate-90" />
-                      <Combine size={11} className="text-blue-500 dark:text-blue-400 shrink-0" />
-                      <span className="font-bold text-blue-700 dark:text-blue-400 truncate">{routeGroup.length} HAWBs merged</span>
+                    <div className="col-span-2 sticky left-0 z-10 -ml-4 pl-4 bg-blue-50 dark:bg-blue-950/90 grid grid-cols-[24px_190px] gap-2 items-center">
+                      <span className="text-gray-900 dark:text-gray-100 font-mono">{rowNumber}</span>
+                      <div className="min-w-0 py-1">
+                        <div className="flex items-center gap-1.5">
+                          <ChevronDown size={11} className="text-blue-400 dark:text-blue-500 shrink-0 -rotate-90" />
+                          <Combine size={11} className="text-blue-500 dark:text-blue-400 shrink-0" />
+                          <span className="text-[10px] font-bold text-blue-500 dark:text-blue-400 shrink-0">{routeGroup.length} HAWBs</span>
+                        </div>
+                        <div className="max-h-12 overflow-y-auto pr-1 mt-0.5 space-y-0.5">
+                          {routeGroup.map(j => (
+                            <div key={j.id} className="font-mono font-bold text-[11px] leading-tight text-blue-700 dark:text-blue-400 truncate">
+                              {j.hawb_number}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                    <span className="inline-flex items-center gap-0.5 min-w-0">
+                    <span className="inline-flex items-center gap-0.5 min-w-0 pl-2">
                       <MapPin size={9} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
                       <span className="text-gray-900 dark:text-gray-100 truncate">
                         {[splitAddress(job.shipper).name, cityLine(job.shipper)].filter(Boolean).join(' · ') || '—'}
@@ -969,11 +1181,11 @@ export default function ManifestDetailPage() {
                         {[splitAddress(job.consignee).name, cityLine(job.consignee)].filter(Boolean).join(' · ') || '—'}
                       </span>
                     </span>
-                    <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{commonValue(collTimes)}</span>
-                    <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{commonValue(delTimes)}</span>
-                    <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{totalPkg}</span>
-                    <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{totalWt}</span>
-                    <div className="flex justify-end">
+                    <span className="text-gray-900 dark:text-gray-100 tabular-nums">{commonValue(collTimes)}</span>
+                    <span className="text-gray-900 dark:text-gray-100 tabular-nums">{commonValue(delTimes)}</span>
+                    <span className="text-gray-900 dark:text-gray-100 tabular-nums">{totalPkg}</span>
+                    <span className="text-gray-900 dark:text-gray-100 tabular-nums">{totalWt}</span>
+                    <div className="flex">
                       {(() => {
                         const svc = commonValue(services);
                         const opt = SERVICE_TYPE_OPTIONS.find(o => o.value === svc);
@@ -997,6 +1209,16 @@ export default function ManifestDetailPage() {
               onClick: () => setSelectedJobId(cur => (cur === job.id ? null : job.id)),
             };
 
+            // Opaque backgrounds for the frozen #/HAWB columns — they need to
+            // fully mask the From/To/etc. columns sliding underneath them as
+            // the table scrolls horizontally, so they can't reuse the row's
+            // own translucent state colors.
+            const stickyBg = selected
+              ? 'bg-emerald-50 dark:bg-emerald-950/90'
+              : isGroupParent
+                ? 'bg-blue-50 dark:bg-blue-950/90'
+                : 'bg-white dark:bg-navy-900';
+
             return (
               <div key={job.id}>
                 {isGroupParent && isFirstInGroup && groupExpanded && (
@@ -1011,23 +1233,25 @@ export default function ManifestDetailPage() {
                 )}
                 <div
                   {...dragProps}
-                  className={`grid grid-cols-[24px_190px_1fr_1fr_56px_56px_44px_50px_112px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
+                  className={`grid grid-cols-[24px_190px_260px_260px_140px_140px_60px_70px_90px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
                     isGroupParent ? 'bg-blue-50/25 dark:bg-blue-950/10' : ''
                   } ${
                     selected ? 'bg-emerald-50/70 dark:bg-emerald-950/25' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
                   }`}
                 >
-                  <span className="text-gray-900 dark:text-gray-100 font-mono">{isGroupParent && groupExpanded ? '' : rowNumber}</span>
-                  <div className="min-w-0 flex items-center gap-1.5">
-                    <ChevronDown size={11} className={`text-gray-300 dark:text-navy-600 shrink-0 transition-transform ${selected ? 'rotate-0' : '-rotate-90'}`} />
-                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 truncate">{job.hawb_number}</span>
-                    <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-500 dark:text-blue-400 shrink-0">
-                      <FileText size={10} />{pages ?? 'Page 1'}
-                    </span>
-                    {job.dangerous_goods_notes && <TriangleAlert size={10} className="text-red-500 shrink-0" />}
-                    {jobIdsWithUpdates.has(job.id) && <RefreshCw size={10} className="text-orange-500 shrink-0" />}
+                  <div className={`col-span-2 sticky left-0 z-10 -ml-4 pl-4 ${stickyBg} grid grid-cols-[24px_190px] gap-2 items-center`}>
+                    <span className="text-gray-900 dark:text-gray-100 font-mono">{isGroupParent && groupExpanded ? '' : rowNumber}</span>
+                    <div className="min-w-0 flex items-center gap-1.5">
+                      <ChevronDown size={11} className={`text-gray-300 dark:text-navy-600 shrink-0 transition-transform ${selected ? 'rotate-0' : '-rotate-90'}`} />
+                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 truncate min-w-0">{job.hawb_number}</span>
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-500 dark:text-blue-400 shrink-0">
+                        <FileText size={10} />{pages ?? 'Page 1'}
+                      </span>
+                      {job.dangerous_goods_notes && <TriangleAlert size={10} className="text-red-500 shrink-0" />}
+                      {jobIdsWithUpdates.has(job.id) && <RefreshCw size={10} className="text-orange-500 shrink-0" />}
+                    </div>
                   </div>
-                  <span className="inline-flex items-center gap-0.5 min-w-0">
+                  <span className="inline-flex items-center gap-0.5 min-w-0 pl-2">
                     <MapPin size={9} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
                     <span className="text-gray-900 dark:text-gray-100 truncate">
                       {[splitAddress(job.shipper).name, cityLine(job.shipper)].filter(Boolean).join(' · ') || '—'}
@@ -1039,11 +1263,11 @@ export default function ManifestDetailPage() {
                       {[splitAddress(job.consignee).name, cityLine(job.consignee)].filter(Boolean).join(' · ') || '—'}
                     </span>
                   </span>
-                  <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{job.collection_at ? formatTime(job.collection_at) : '—'}</span>
-                  <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{job.delivery_at ? formatTime(job.delivery_at) : '—'}</span>
-                  <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{job.package_qty ?? '—'}</span>
-                  <span className="text-gray-900 dark:text-gray-100 text-right tabular-nums">{job.weight_kg ?? '—'}</span>
-                  <div className="flex justify-end">
+                  <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.collection_at ? formatTime(job.collection_at) : '—'}</span>
+                  <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.delivery_at ? formatTime(job.delivery_at) : '—'}</span>
+                  <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.package_qty ?? '—'}</span>
+                  <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.weight_kg ?? '—'}</span>
+                  <div className="flex">
                     <ServiceTypePicker
                       value={job.job_service_type ?? ''}
                       disabled={locked}
