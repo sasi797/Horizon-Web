@@ -725,10 +725,31 @@ export default function ManifestDetailPage() {
     jobsMissingService > 0 && `Del/Coll on ${jobsMissingService} job${jobsMissingService === 1 ? '' : 's'}`,
   ].filter((v): v is string => Boolean(v));
 
-  // Start/end point pickers are closed lists driven by Configuration (module
-  // 'manifest', fields 'start_point'/'end_point') — manage the options there.
-  const startOptions = savedStartPoints.map(v => ({ value: v.value, label: v.label }));
-  const endOptions = savedEndPoints.map(v => ({ value: v.value, label: v.label }));
+  // Start/end point pickers offer the Configuration defaults (module 'manifest',
+  // fields 'start_point'/'end_point') plus, per job, whichever address matches its
+  // Service selection — Coll contributes its collection (from) address, Del its
+  // delivery (to) address — into both pickers, since either can turn out to be the
+  // manifest's actual route start or end.
+  const jobPointCandidates = new Map<string, string>();
+  orderedJobs.forEach(j => {
+    if (j.job_service_type === 'collection' && j.shipper) {
+      jobPointCandidates.set(j.shipper, [splitAddress(j.shipper).name, cityLine(j.shipper)].filter(Boolean).join(' · '));
+    } else if (j.job_service_type === 'delivery' && j.consignee) {
+      jobPointCandidates.set(j.consignee, [splitAddress(j.consignee).name, cityLine(j.consignee)].filter(Boolean).join(' · '));
+    }
+  });
+  const startOptions = Array.from(
+    new Map([
+      ...savedStartPoints.map(v => [v.value, v.label] as const),
+      ...jobPointCandidates,
+    ]).entries(),
+  ).map(([value, label]) => ({ value, label }));
+  const endOptions = Array.from(
+    new Map([
+      ...savedEndPoints.map(v => [v.value, v.label] as const),
+      ...jobPointCandidates,
+    ]).entries(),
+  ).map(([value, label]) => ({ value, label }));
   const withCurrentValue = (options: { value: string; label: string }[], current: string) =>
     !current || options.some(o => o.value === current) ? options : [{ value: current, label: current }, ...options];
 
