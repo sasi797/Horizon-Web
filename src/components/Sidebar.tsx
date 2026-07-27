@@ -10,6 +10,7 @@ import {
   PackageCheck,
   Users,
   ShieldCheck,
+  ListTree,
   LayoutDashboard,
   Sun,
   Moon,
@@ -28,6 +29,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 const adminItems = [
   { icon: Users, label: 'Users', color: 'bg-blue-500 text-white', href: '/dashboard/users' },
   { icon: ShieldCheck, label: 'Roles', color: 'bg-purple-500 text-white', href: '/dashboard/roles' },
+  { icon: ListTree, label: 'Configuration', color: 'bg-amber-500 text-white', href: '/dashboard/menu-configuration' },
 ];
 
 const systemItems = [

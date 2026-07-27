@@ -22,6 +22,7 @@ import ApiErrorState from '@/components/ApiErrorState';
 import Tooltip from '@/components/Tooltip';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { splitAddress, cityLine, cityAndPostcodeLine } from '@/lib/hawbFormat';
+import { useGetDropdownValuesQuery } from '@/services/dropdownApi';
 
 const MANIFEST_STATUS_BADGE: Record<string, string> = {
   pending_review: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
@@ -579,6 +580,8 @@ export default function ManifestDetailPage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const { data: jobUpdates = [] } = useGetJobUpdatesQuery();
   const [applyJobUpdate] = useApplyJobUpdateMutation();
+  const { data: savedStartPoints = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'start_point' });
+  const { data: savedEndPoints = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'end_point' });
 
   const [orderedJobs, setOrderedJobs] = useState<HawbJob[]>([]);
   const [syncedJobs, setSyncedJobs] = useState<HawbJob[] | undefined>(undefined);
@@ -722,25 +725,10 @@ export default function ManifestDetailPage() {
     jobsMissingService > 0 && `Del/Coll on ${jobsMissingService} job${jobsMissingService === 1 ? '' : 's'}`,
   ].filter((v): v is string => Boolean(v));
 
-  // Start/end point pickers offer the collection & delivery addresses already present on
-  // this manifest's run, so choosing a start point can auto-fill its matching end point.
-  const startOptions = Array.from(
-    new Map(
-      orderedJobs.filter(j => j.shipper).map(j => [j.shipper as string, {
-        value: j.shipper as string,
-        label: [splitAddress(j.shipper).name, cityLine(j.shipper)].filter(Boolean).join(' · '),
-        pairedEnd: j.consignee ?? '',
-      }]),
-    ).values(),
-  );
-  const endOptions = Array.from(
-    new Map(
-      orderedJobs.filter(j => j.consignee).map(j => [j.consignee as string, {
-        value: j.consignee as string,
-        label: [splitAddress(j.consignee).name, cityLine(j.consignee)].filter(Boolean).join(' · '),
-      }]),
-    ).values(),
-  );
+  // Start/end point pickers are closed lists driven by Configuration (module
+  // 'manifest', fields 'start_point'/'end_point') — manage the options there.
+  const startOptions = savedStartPoints.map(v => ({ value: v.value, label: v.label }));
+  const endOptions = savedEndPoints.map(v => ({ value: v.value, label: v.label }));
   const withCurrentValue = (options: { value: string; label: string }[], current: string) =>
     !current || options.some(o => o.value === current) ? options : [{ value: current, label: current }, ...options];
 
@@ -986,13 +974,8 @@ export default function ManifestDetailPage() {
               placeholder="Select collection start location..."
               options={withCurrentValue(startOptions, manifestFields.start_point)}
               onChange={value => {
-                const match = startOptions.find(o => o.value === value);
-                const nextEnd = match?.pairedEnd || manifestFields.end_point;
-                setManifestFields(f => ({ ...f, start_point: value, end_point: nextEnd }));
+                setManifestFields(f => ({ ...f, start_point: value }));
                 saveManifestField('start_point', value);
-                if (match?.pairedEnd && match.pairedEnd !== manifestFields.end_point) {
-                  saveManifestField('end_point', match.pairedEnd);
-                }
               }}
             />
           </Field>
