@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Check, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Weight, Navigation, Flag, Ban, List, Combine } from 'lucide-react';
+import { ChevronDown, Check, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Navigation, Flag, Ban, List, Combine, Weight, User, CalendarClock, Truck } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestQuery,
@@ -229,6 +229,16 @@ function formatTime(value: string): string {
   return `${day}/${month}/${year} ${hour}:${minute}`;
 }
 
+// Unlike formatTime above, created_at is a real UTC instant (an audit
+// timestamp, not a wall-clock value lifted from the PDF), so it's fine —
+// correct, even — to let the browser convert it to local time here.
+function formatDateTime(value: string): string {
+  const d = new Date(value);
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return `${date} · ${time}`;
+}
+
 function toDatetimeLocal(value: string | null): string {
   if (!value) return '';
   return value.slice(0, 16);
@@ -375,6 +385,26 @@ function ManifestPlaceholderState({ manifest, onBack }: { manifest: HawbManifest
   );
 }
 
+const ROW1_ICON_TONE = 'text-gray-400 dark:text-navy-500';
+const ROW2_ICON_TONE = 'text-emerald-500 dark:text-emerald-400';
+
+function PropLabel({
+  icon: Icon, iconTone, children, required,
+}: {
+  icon?: React.ComponentType<{ size?: number; className?: string }>;
+  iconTone?: string;
+  children: React.ReactNode;
+  required?: boolean;
+}) {
+  return (
+    <p className="flex items-center gap-1 text-[9.5px] font-semibold text-gray-500/85 dark:text-navy-400/85 uppercase tracking-wide mb-1">
+      {Icon && <Icon size={10} className={`shrink-0 ${iconTone ?? ''}`} />}
+      {children}
+      {required && <span className="w-1 h-1 rounded-full bg-red-500 dark:bg-red-400 shrink-0" />}
+    </p>
+  );
+}
+
 function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
@@ -408,14 +438,21 @@ function inputClass(locked: boolean) {
   }`;
 }
 
+const TAG_CLASSES: Record<'gray' | 'blue' | 'purple', string> = {
+  gray: 'bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-navy-300',
+  blue: 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400',
+  purple: 'bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-400',
+};
+
 function LocationSelect({
-  value, options, placeholder, disabled, onChange,
+  value, options, disabled, onChange, tag, emptyLabel = 'Empty',
 }: {
   value: string;
   options: { value: string; label: string }[];
-  placeholder: string;
   disabled: boolean;
   onChange: (value: string) => void;
+  tag?: 'gray' | 'blue' | 'purple';
+  emptyLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -438,17 +475,27 @@ function LocationSelect({
 
   return (
     <div ref={ref} className="relative">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen(o => !o)}
-        className={`${inputClass(disabled)} flex items-center justify-between gap-2 text-left ${open ? 'border-emerald-300 dark:border-emerald-600 ring-2 ring-emerald-100 dark:ring-emerald-900/40' : ''}`}
-      >
-        <span className={`truncate ${selected ? 'text-gray-700 dark:text-gray-200' : 'text-gray-400 dark:text-navy-500'}`}>
-          {selected ? selected.label : placeholder}
-        </span>
-        <ChevronDown size={14} className={`text-gray-500 dark:text-navy-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
+      <Tooltip content={selected?.label} side="top" className="block">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setOpen(o => !o)}
+          className={`group w-full flex items-center justify-between gap-1.5 text-left rounded-md -mx-2 px-2 py-1.5 transition-colors ${
+            disabled ? 'cursor-not-allowed opacity-60' : 'hover:bg-gray-50 dark:hover:bg-navy-800/60'
+          } ${open ? 'bg-gray-50 dark:bg-navy-800/60' : ''}`}
+        >
+          {selected ? (
+            tag ? (
+              <span className={`truncate text-[11px] font-semibold px-1.5 py-0.5 rounded-md ${TAG_CLASSES[tag]}`}>{selected.label}</span>
+            ) : (
+              <span className="truncate text-[12.5px] font-medium text-gray-800 dark:text-gray-100">{selected.label}</span>
+            )
+          ) : (
+            <span className="truncate text-[12.5px] text-gray-300 dark:text-navy-600">{emptyLabel}</span>
+          )}
+          <ChevronDown size={12} className={`text-gray-400 dark:text-navy-500 shrink-0 transition-all ${open ? 'opacity-100 rotate-180' : 'opacity-0 group-hover:opacity-100'}`} />
+        </button>
+      </Tooltip>
 
       <AnimatePresence>
         {open && (
@@ -465,19 +512,20 @@ function LocationSelect({
             {options.map(o => {
               const isSelected = o.value === value;
               return (
-                <button
-                  key={o.value}
-                  type="button"
-                  onClick={() => { onChange(o.value); setOpen(false); }}
-                  className={`w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-[12.5px] transition-colors ${
-                    isSelected
-                      ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold'
-                      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-navy-700'
-                  }`}
-                >
-                  <span className="truncate">{o.label}</span>
-                  {isSelected && <Check size={13} className="shrink-0" />}
-                </button>
+                <Tooltip key={o.value} content={o.label} side="right" className="block">
+                  <button
+                    type="button"
+                    onClick={() => { onChange(o.value); setOpen(false); }}
+                    className={`w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-[12.5px] transition-colors ${
+                      isSelected
+                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold'
+                        : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-navy-700'
+                    }`}
+                  >
+                    <span className="truncate">{o.label}</span>
+                    {isSelected && <Check size={13} className="shrink-0" />}
+                  </button>
+                </Tooltip>
               );
             })}
           </motion.div>
@@ -939,130 +987,137 @@ export default function ManifestDetailPage() {
         onClose={() => setShowCancelConfirm(false)}
       />
 
-      <motion.div variants={staggerItem} className="grid grid-cols-4 gap-2.5">
-        {[
-          { label: 'Packages', value: packageCount, icon: PackageIcon, tone: 'text-purple-500 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/30' },
-          { label: 'Total weight', value: `${manifest.total_weight_kg.toFixed(2)} kg`, icon: Weight, tone: 'text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30' },
-          { label: 'Dangerous goods', value: dgCount, icon: TriangleAlert, tone: dgCount > 0 ? 'text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/30' : 'text-gray-500 dark:text-navy-500 bg-gray-50 dark:bg-navy-800/60' },
-        ].map(stat => (
-          <div key={stat.label} className="flex items-center gap-2.5 bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5">
-            <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${stat.tone}`}>
-              <stat.icon size={13} strokeWidth={2} />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-gray-500 dark:text-navy-500 uppercase tracking-wide truncate">{stat.label}</p>
-              <p className="text-[14px] font-black text-gray-900 dark:text-gray-100 leading-tight mt-0.5">{stat.value}</p>
-            </div>
+      <motion.div variants={staggerItem} className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm p-3.5">
+        <div className="grid grid-cols-6 gap-x-3.5 gap-y-2.5 pb-3">
+          <div className="min-w-0 rounded-md px-2 py-1.5 -mx-2">
+            <PropLabel icon={PackageIcon} iconTone={ROW1_ICON_TONE}>Packages</PropLabel>
+            <p className="text-[12.5px] font-medium text-gray-800 dark:text-gray-100 truncate">{packageCount}</p>
           </div>
-        ))}
-        <Tooltip content="View full PDF in a new tab" side="bottom" className="block">
-          <button
-            onClick={async () => {
-              // pdf_url is a presigned S3 link that expires after an hour — the
-              // cached copy may be stale if this tab has been open a while, so
-              // open the tab immediately (to keep the user gesture) then point
-              // it at a freshly refetched URL once available.
-              const pdfWindow = window.open('', '_blank');
-              try {
-                const fresh = await refetch().unwrap();
-                if (pdfWindow) pdfWindow.location.href = fresh.pdf_url;
-              } catch {
-                if (pdfWindow) pdfWindow.location.href = manifest.pdf_url;
-              }
-            }}
-            className="w-full flex items-center gap-2.5 bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5 hover:bg-gray-50 dark:hover:bg-navy-800 transition-colors text-left"
-          >
-            <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30">
-              <FileText size={13} strokeWidth={2} />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-gray-500 dark:text-navy-500 uppercase tracking-wide truncate">Document</p>
-              <p className="flex items-center gap-1 text-[14px] font-black text-gray-900 dark:text-gray-100 leading-tight mt-0.5">
+          <div className="min-w-0 rounded-md px-2 py-1.5 -mx-2">
+            <PropLabel icon={Weight} iconTone={ROW1_ICON_TONE}>Total weight</PropLabel>
+            <p className="text-[12.5px] font-medium text-gray-800 dark:text-gray-100 truncate">{manifest.total_weight_kg.toFixed(2)} kg</p>
+          </div>
+          <div className="min-w-0 rounded-md px-2 py-1.5 -mx-2">
+            <PropLabel icon={TriangleAlert} iconTone={ROW1_ICON_TONE}>Dangerous goods</PropLabel>
+            <p className={`text-[12.5px] font-semibold truncate ${dgCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-gray-100'}`}>{dgCount}</p>
+          </div>
+          <div className="min-w-0 rounded-md px-2 py-1.5 -mx-2">
+            <PropLabel icon={User} iconTone={ROW1_ICON_TONE}>Created by</PropLabel>
+            <p className="flex items-center gap-1.5 text-[12.5px] font-medium text-gray-800 dark:text-gray-100 truncate">
+              <span className="w-4 h-4 rounded-full bg-gray-300 dark:bg-navy-700 text-white text-[8px] font-bold flex items-center justify-center shrink-0">
+                {(manifest.created_by_name ?? 'System').charAt(0).toUpperCase()}
+              </span>
+              {manifest.created_by_name ?? 'System'}
+            </p>
+          </div>
+          <div className="min-w-0 rounded-md px-2 py-1.5 -mx-2">
+            <PropLabel icon={CalendarClock} iconTone={ROW1_ICON_TONE}>Uploaded</PropLabel>
+            <p className="text-[12.5px] font-medium text-gray-800 dark:text-gray-100 truncate">{formatDateTime(manifest.created_at)}</p>
+          </div>
+          <Tooltip content="View full PDF in a new tab" side="top" className="block">
+            <button
+              onClick={async () => {
+                // pdf_url is a presigned S3 link that expires after an hour — the
+                // cached copy may be stale if this tab has been open a while, so
+                // open the tab immediately (to keep the user gesture) then point
+                // it at a freshly refetched URL once available.
+                const pdfWindow = window.open('', '_blank');
+                try {
+                  const fresh = await refetch().unwrap();
+                  if (pdfWindow) pdfWindow.location.href = fresh.pdf_url;
+                } catch {
+                  if (pdfWindow) pdfWindow.location.href = manifest.pdf_url;
+                }
+              }}
+              className="min-w-0 w-full text-left rounded-md px-2 py-1.5 -mx-2 hover:bg-gray-50 dark:hover:bg-navy-800/60 transition-colors"
+            >
+              <PropLabel icon={FileText} iconTone={ROW1_ICON_TONE}>Document</PropLabel>
+              <p className="flex items-center gap-1 text-[12.5px] font-medium text-emerald-600 dark:text-emerald-400 truncate">
                 View PDF
-                <ExternalLink size={11} strokeWidth={2.5} className="text-gray-500 dark:text-navy-500" />
+                <ExternalLink size={10} strokeWidth={2.5} className="shrink-0" />
               </p>
-            </div>
-          </button>
-        </Tooltip>
-      </motion.div>
+            </button>
+          </Tooltip>
+        </div>
 
-      <motion.div variants={staggerItem} className="grid grid-cols-2 gap-2.5">
-        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5">
-          <Field label={<span className="inline-flex items-center gap-1"><Navigation size={10} /> Start point</span>}>
+        <div className="grid grid-cols-6 gap-x-3.5 gap-y-2.5 pt-3 border-t border-dashed border-gray-200 dark:border-navy-800">
+          <div className="min-w-0">
+            <PropLabel icon={Navigation} iconTone={ROW2_ICON_TONE}>Start point</PropLabel>
             <LocationSelect
               disabled={locked}
               value={manifestFields.start_point}
-              placeholder="Select collection start location..."
+              emptyLabel="Empty"
               options={withCurrentValue(startOptions, manifestFields.start_point)}
               onChange={value => {
                 setManifestFields(f => ({ ...f, start_point: value }));
                 saveManifestField('start_point', value);
               }}
             />
-          </Field>
-        </div>
-        <div className="bg-white dark:bg-navy-900 rounded-xl border border-gray-100 dark:border-navy-800 px-3.5 py-2.5">
-          <Field label={<span className="inline-flex items-center gap-1"><Flag size={10} /> End point</span>}>
+          </div>
+          <div className="min-w-0">
+            <PropLabel icon={Flag} iconTone={ROW2_ICON_TONE}>End point</PropLabel>
             <LocationSelect
               disabled={locked}
               value={manifestFields.end_point}
-              placeholder="Select final delivery location..."
+              emptyLabel="Empty"
               options={withCurrentValue(endOptions, manifestFields.end_point)}
               onChange={value => {
                 setManifestFields(f => ({ ...f, end_point: value }));
                 saveManifestField('end_point', value);
               }}
             />
-          </Field>
-        </div>
-      </motion.div>
-
-      <motion.div variants={staggerItem} className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm overflow-hidden">
-        <div className="grid grid-cols-4 gap-4 p-4">
-          <Field label={<span>Account number <span className="text-red-500">*</span></span>}>
+          </div>
+          <div className="min-w-0">
+            <PropLabel icon={Banknote} iconTone={ROW2_ICON_TONE} required>Account number</PropLabel>
             <LocationSelect
               disabled={locked}
               value={manifestFields.account_number}
-              placeholder="Select account number..."
+              emptyLabel="Empty"
+              tag="gray"
               options={withCurrentValue(ACCOUNT_NUMBER_OPTIONS, manifestFields.account_number)}
               onChange={value => {
                 setManifestFields(f => ({ ...f, account_number: value }));
                 saveManifestField('account_number', value);
               }}
             />
-          </Field>
-          <Field label={<span>Service type <span className="text-red-500">*</span></span>}>
+          </div>
+          <div className="min-w-0">
+            <PropLabel icon={List} iconTone={ROW2_ICON_TONE} required>Service type</PropLabel>
             <LocationSelect
               disabled={locked}
               value={indigoFields.service_type}
-              placeholder="Select service type..."
+              emptyLabel="Empty"
+              tag="blue"
               options={withCurrentValue(INDIGO_SERVICE_TYPE_OPTIONS, indigoFields.service_type)}
               onChange={value => setIndigoFields(f => ({ ...f, service_type: value }))}
             />
-          </Field>
-          <Field label={<span>Vehicle size <span className="text-red-500">*</span></span>}>
+          </div>
+          <div className="min-w-0">
+            <PropLabel icon={Truck} iconTone={ROW2_ICON_TONE} required>Vehicle size</PropLabel>
             <LocationSelect
               disabled={locked}
               value={manifestFields.vehicle_size}
-              placeholder="Select vehicle size..."
+              emptyLabel="Empty"
+              tag="purple"
               options={withCurrentValue(VEHICLE_SIZE_OPTIONS, manifestFields.vehicle_size)}
               onChange={value => {
                 setManifestFields(f => ({ ...f, vehicle_size: value }));
                 saveManifestField('vehicle_size', value);
               }}
             />
-          </Field>
-          <Field label={<span>Job reference <span className="text-red-500">*</span></span>}>
+          </div>
+          <div className="min-w-0">
+            <PropLabel icon={Hash} iconTone={ROW2_ICON_TONE} required>Job reference</PropLabel>
             <input
               type="text"
               disabled={locked}
               value={manifestFields.job_reference}
-              placeholder="Enter job reference..."
+              placeholder="Empty"
               onChange={e => setManifestFields(f => ({ ...f, job_reference: e.target.value }))}
               onBlur={e => saveManifestField('job_reference', e.target.value)}
-              className={inputClass(locked)}
+              className={`w-full text-[12.5px] font-medium text-gray-800 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-navy-600 placeholder:font-normal bg-transparent border-none rounded-md px-2 py-1.5 -mx-2 hover:bg-gray-50 dark:hover:bg-navy-800/60 focus:bg-gray-50 dark:focus:bg-navy-800/60 focus:outline-none focus:ring-1 focus:ring-emerald-300 dark:focus:ring-emerald-700 transition-colors ${locked ? 'opacity-60 cursor-not-allowed' : ''}`}
             />
-          </Field>
+          </div>
         </div>
       </motion.div>
 
@@ -1108,7 +1163,7 @@ export default function ManifestDetailPage() {
 
         <div className="overflow-x-auto">
         <div className="min-w-[1520px]">
-        <div className="grid grid-cols-[24px_190px_260px_100px_260px_100px_140px_140px_60px_70px_90px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
+        <div className="grid grid-cols-[24px_190px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_100px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
           <div className="col-span-2 sticky left-0 z-10 -ml-4 pl-4 bg-white dark:bg-navy-900 grid grid-cols-[24px_190px] gap-2">
             <span>#</span>
             <span>HAWB</span>
@@ -1158,7 +1213,7 @@ export default function ManifestDetailPage() {
                 <div key={groupKey}>
                   <div
                     onClick={() => setExpandedGroups(prev => new Set(prev).add(groupKey))}
-                    className="grid grid-cols-[24px_190px_260px_100px_260px_100px_140px_140px_60px_70px_90px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25"
+                    className="grid grid-cols-[24px_190px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_100px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25"
                   >
                     <div className="col-span-2 sticky left-0 z-10 -ml-4 pl-4 bg-blue-50 dark:bg-blue-950/90 grid grid-cols-[24px_190px] gap-2 items-center">
                       <span className="text-gray-900 dark:text-gray-100 font-mono">{rowNumber}</span>
@@ -1243,7 +1298,7 @@ export default function ManifestDetailPage() {
                 )}
                 <div
                   {...dragProps}
-                  className={`grid grid-cols-[24px_190px_260px_100px_260px_100px_140px_140px_60px_70px_90px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
+                  className={`grid grid-cols-[24px_190px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_100px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
                     isGroupParent ? 'bg-blue-50/25 dark:bg-blue-950/10' : ''
                   } ${
                     selected ? 'bg-emerald-50/70 dark:bg-emerald-950/25' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
