@@ -713,11 +713,13 @@ export default function ManifestDetailPage() {
   const dgCount = orderedJobs.filter(j => j.dangerous_goods).length;
   const packageCount = orderedJobs.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
   const jobIdsWithUpdates = new Set(jobUpdates.map(u => u.job_id));
+  const jobsMissingService = orderedJobs.filter(j => !j.job_service_type).length;
   const missingExportFields = [
     !manifestFields.job_reference && 'Job reference',
     !manifestFields.account_number && 'Account number',
     !manifestFields.vehicle_size && 'Vehicle size',
     !indigoFields.service_type && 'Service type',
+    jobsMissingService > 0 && `Del/Coll on ${jobsMissingService} job${jobsMissingService === 1 ? '' : 's'}`,
   ].filter((v): v is string => Boolean(v));
 
   // Start/end point pickers offer the collection & delivery addresses already present on
@@ -1101,14 +1103,16 @@ export default function ManifestDetailPage() {
         </div>
 
         <div className="overflow-x-auto">
-        <div className="min-w-[1320px]">
-        <div className="grid grid-cols-[24px_190px_260px_260px_140px_140px_60px_70px_90px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
+        <div className="min-w-[1520px]">
+        <div className="grid grid-cols-[24px_190px_260px_100px_260px_100px_140px_140px_60px_70px_90px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
           <div className="col-span-2 sticky left-0 z-10 -ml-4 pl-4 bg-white dark:bg-navy-900 grid grid-cols-[24px_190px] gap-2">
             <span>#</span>
             <span>HAWB</span>
           </div>
           <span className="pl-2">From</span>
+          <span>Col postcode</span>
           <span>To</span>
+          <span>Del postcode</span>
           <span>Coll.</span>
           <span>Del.</span>
           <span>Pkg</span>
@@ -1150,7 +1154,7 @@ export default function ManifestDetailPage() {
                 <div key={groupKey}>
                   <div
                     onClick={() => setExpandedGroups(prev => new Set(prev).add(groupKey))}
-                    className="grid grid-cols-[24px_190px_260px_260px_140px_140px_60px_70px_90px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25"
+                    className="grid grid-cols-[24px_190px_260px_100px_260px_100px_140px_140px_60px_70px_90px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25"
                   >
                     <div className="col-span-2 sticky left-0 z-10 -ml-4 pl-4 bg-blue-50 dark:bg-blue-950/90 grid grid-cols-[24px_190px] gap-2 items-center">
                       <span className="text-gray-900 dark:text-gray-100 font-mono">{rowNumber}</span>
@@ -1175,12 +1179,14 @@ export default function ManifestDetailPage() {
                         {[splitAddress(job.shipper).name, cityLine(job.shipper)].filter(Boolean).join(' · ') || '—'}
                       </span>
                     </span>
+                    <span className="text-gray-900 dark:text-gray-100 truncate">{cityAndPostcodeLine(job.shipper).postcode || '—'}</span>
                     <span className="inline-flex items-center gap-0.5 min-w-0">
                       <Building2 size={9} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
                       <span className="text-gray-900 dark:text-gray-100 truncate">
                         {[splitAddress(job.consignee).name, cityLine(job.consignee)].filter(Boolean).join(' · ') || '—'}
                       </span>
                     </span>
+                    <span className="text-gray-900 dark:text-gray-100 truncate">{cityAndPostcodeLine(job.consignee).postcode || '—'}</span>
                     <span className="text-gray-900 dark:text-gray-100 tabular-nums">{commonValue(collTimes)}</span>
                     <span className="text-gray-900 dark:text-gray-100 tabular-nums">{commonValue(delTimes)}</span>
                     <span className="text-gray-900 dark:text-gray-100 tabular-nums">{totalPkg}</span>
@@ -1233,7 +1239,7 @@ export default function ManifestDetailPage() {
                 )}
                 <div
                   {...dragProps}
-                  className={`grid grid-cols-[24px_190px_260px_260px_140px_140px_60px_70px_90px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
+                  className={`grid grid-cols-[24px_190px_260px_100px_260px_100px_140px_140px_60px_70px_90px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
                     isGroupParent ? 'bg-blue-50/25 dark:bg-blue-950/10' : ''
                   } ${
                     selected ? 'bg-emerald-50/70 dark:bg-emerald-950/25' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
@@ -1257,12 +1263,14 @@ export default function ManifestDetailPage() {
                       {[splitAddress(job.shipper).name, cityLine(job.shipper)].filter(Boolean).join(' · ') || '—'}
                     </span>
                   </span>
+                  <span className="text-gray-900 dark:text-gray-100 truncate">{cityAndPostcodeLine(job.shipper).postcode || '—'}</span>
                   <span className="inline-flex items-center gap-0.5 min-w-0">
                     <Building2 size={9} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
                     <span className="text-gray-900 dark:text-gray-100 truncate">
                       {[splitAddress(job.consignee).name, cityLine(job.consignee)].filter(Boolean).join(' · ') || '—'}
                     </span>
                   </span>
+                  <span className="text-gray-900 dark:text-gray-100 truncate">{cityAndPostcodeLine(job.consignee).postcode || '—'}</span>
                   <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.collection_at ? formatTime(job.collection_at) : '—'}</span>
                   <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.delivery_at ? formatTime(job.delivery_at) : '—'}</span>
                   <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.package_qty ?? '—'}</span>
