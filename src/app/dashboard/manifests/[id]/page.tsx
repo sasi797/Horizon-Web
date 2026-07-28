@@ -31,7 +31,7 @@ const MANIFEST_STATUS_BADGE: Record<string, string> = {
   booked: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
   confirmed: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
   on_hold: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
-  exported: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+  exported: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300',
   cancelled: 'bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400',
   extracting: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400',
   failed: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
