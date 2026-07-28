@@ -1353,7 +1353,7 @@ export default function ManifestDetailPage() {
                       transition={{ duration: 0.2, ease: 'easeOut' }}
                       className="overflow-hidden bg-gray-50/40 dark:bg-navy-950/20 border-t border-gray-100 dark:border-navy-800"
                     >
-                      <div className="px-4 py-4 space-y-6">
+                      <div className="px-4 py-4 space-y-6 max-w-4xl">
                         {job.blind_pdf_url && (
                           <div className="flex items-center justify-end">
                             <Tooltip content="View the companion MF-PCS PDF used to fill in redacted fields" side="bottom">
@@ -1368,7 +1368,7 @@ export default function ManifestDetailPage() {
                         )}
 
                         {/* Shipper / Consignee */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <Section icon={MapPin} title="Shipper">
                             <textarea
                               disabled={locked}
