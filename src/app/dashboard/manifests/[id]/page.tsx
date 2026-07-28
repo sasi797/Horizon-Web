@@ -896,7 +896,7 @@ export default function ManifestDetailPage() {
 
   return (
     <motion.div variants={pageTransition} initial="hidden" animate="visible" className="space-y-3">
-      <motion.div variants={staggerItem} className="flex items-start justify-between gap-3">
+      <motion.div variants={staggerItem} className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex items-start gap-3">
           <button
             onClick={() => router.push('/dashboard/manifests')}
@@ -988,7 +988,7 @@ export default function ManifestDetailPage() {
       />
 
       <motion.div variants={staggerItem} className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm p-3.5">
-        <div className="grid grid-cols-6 gap-x-3.5 gap-y-2.5 pb-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-x-3.5 gap-y-2.5 pb-3">
           <div className="min-w-0 rounded-md px-2 py-1.5 -mx-2">
             <PropLabel icon={PackageIcon} iconTone={ROW1_ICON_TONE}>Packages</PropLabel>
             <p className="text-[12.5px] font-medium text-gray-800 dark:text-gray-100 truncate">{packageCount}</p>
@@ -1040,7 +1040,7 @@ export default function ManifestDetailPage() {
           </Tooltip>
         </div>
 
-        <div className="grid grid-cols-6 gap-x-3.5 gap-y-2.5 pt-3 border-t border-dashed border-gray-200 dark:border-navy-800">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-x-3.5 gap-y-2.5 pt-3 border-t border-dashed border-gray-200 dark:border-navy-800">
           <div className="min-w-0">
             <PropLabel icon={Navigation} iconTone={ROW2_ICON_TONE}>Start point</PropLabel>
             <LocationSelect
