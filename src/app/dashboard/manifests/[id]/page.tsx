@@ -999,8 +999,8 @@ export default function ManifestDetailPage() {
         </div>
 
         <div className="overflow-x-auto">
-        <div className="min-w-[1520px]">
-        <div className="grid grid-cols-[24px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
+        <div className="min-w-[1630px]">
+        <div className="grid grid-cols-[24px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_110px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
           <div className="col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[346px] bg-white dark:bg-navy-900 grid grid-cols-[24px_190px_100px] gap-2">
             <span>#</span>
             <span>HAWB</span>
@@ -1014,6 +1014,7 @@ export default function ManifestDetailPage() {
           <span>Del.</span>
           <span>Pkg</span>
           <span>Wt (kg)</span>
+          <span>Indigo Job#</span>
         </div>
 
         <div className="divide-y divide-gray-50 dark:divide-navy-800/70">
@@ -1050,7 +1051,7 @@ export default function ManifestDetailPage() {
                 <div key={groupKey}>
                   <div
                     onClick={() => setExpandedGroups(prev => new Set(prev).add(groupKey))}
-                    className="grid grid-cols-[24px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25"
+                    className="grid grid-cols-[24px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_110px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25"
                   >
                     <div className="col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[346px] bg-blue-50 dark:bg-blue-950/90 grid grid-cols-[24px_190px_100px] gap-2 items-center">
                       <span className="text-gray-900 dark:text-gray-100 font-mono">{rowNumber}</span>
@@ -1098,6 +1099,7 @@ export default function ManifestDetailPage() {
                     <span className="text-gray-900 dark:text-gray-100 tabular-nums">{commonValue(delTimes)}</span>
                     <span className="text-gray-900 dark:text-gray-100 tabular-nums">{totalPkg}</span>
                     <span className="text-gray-900 dark:text-gray-100 tabular-nums">{totalWt}</span>
+                    <span className="text-gray-900 dark:text-gray-100 font-mono truncate">{commonValue(routeGroup.map(j => j.indigo_job_number ?? '—'))}</span>
                   </div>
                 </div>
               );
@@ -1135,7 +1137,7 @@ export default function ManifestDetailPage() {
                 )}
                 <div
                   {...dragProps}
-                  className={`grid grid-cols-[24px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
+                  className={`grid grid-cols-[24px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_110px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
                     isGroupParent ? 'bg-blue-50/25 dark:bg-blue-950/10' : ''
                   } ${
                     selected ? 'bg-emerald-50/70 dark:bg-emerald-950/25' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
@@ -1178,6 +1180,7 @@ export default function ManifestDetailPage() {
                   <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.delivery_at ? formatTime(job.delivery_at) : '—'}</span>
                   <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.package_qty ?? '—'}</span>
                   <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.weight_kg ?? '—'}</span>
+                  <span className="text-gray-900 dark:text-gray-100 font-mono truncate">{job.indigo_job_number ?? '—'}</span>
                 </div>
 
                 <AnimatePresence initial={false}>
