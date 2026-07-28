@@ -1163,10 +1163,11 @@ export default function ManifestDetailPage() {
 
         <div className="overflow-x-auto">
         <div className="min-w-[1520px]">
-        <div className="grid grid-cols-[24px_190px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_100px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
-          <div className="col-span-2 sticky left-0 z-10 -ml-4 pl-4 bg-white dark:bg-navy-900 grid grid-cols-[24px_190px] gap-2">
+        <div className="grid grid-cols-[24px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
+          <div className="col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[346px] bg-white dark:bg-navy-900 grid grid-cols-[24px_190px_100px] gap-2">
             <span>#</span>
             <span>HAWB</span>
+            <span>Service</span>
           </div>
           <span className="pl-2">From</span>
           <span>Col postcode</span>
@@ -1176,7 +1177,6 @@ export default function ManifestDetailPage() {
           <span>Del.</span>
           <span>Pkg</span>
           <span>Wt (kg)</span>
-          <span>Service</span>
         </div>
 
         <div className="divide-y divide-gray-50 dark:divide-navy-800/70">
@@ -1213,9 +1213,9 @@ export default function ManifestDetailPage() {
                 <div key={groupKey}>
                   <div
                     onClick={() => setExpandedGroups(prev => new Set(prev).add(groupKey))}
-                    className="grid grid-cols-[24px_190px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_100px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25"
+                    className="grid grid-cols-[24px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25"
                   >
-                    <div className="col-span-2 sticky left-0 z-10 -ml-4 pl-4 bg-blue-50 dark:bg-blue-950/90 grid grid-cols-[24px_190px] gap-2 items-center">
+                    <div className="col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[346px] bg-blue-50 dark:bg-blue-950/90 grid grid-cols-[24px_190px_100px] gap-2 items-center">
                       <span className="text-gray-900 dark:text-gray-100 font-mono">{rowNumber}</span>
                       <div className="min-w-0 py-1">
                         <div className="flex items-center gap-1.5">
@@ -1230,6 +1230,17 @@ export default function ManifestDetailPage() {
                             </div>
                           ))}
                         </div>
+                      </div>
+                      <div className="flex">
+                        {(() => {
+                          const svc = commonValue(services);
+                          const opt = SERVICE_TYPE_OPTIONS.find(o => o.value === svc);
+                          return (
+                            <span className="text-[10px] font-bold text-gray-500 dark:text-navy-400 whitespace-nowrap">
+                              {opt ? opt.short : 'Mixed'}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                     <span className="inline-flex items-center gap-0.5 min-w-0 pl-2">
@@ -1250,17 +1261,6 @@ export default function ManifestDetailPage() {
                     <span className="text-gray-900 dark:text-gray-100 tabular-nums">{commonValue(delTimes)}</span>
                     <span className="text-gray-900 dark:text-gray-100 tabular-nums">{totalPkg}</span>
                     <span className="text-gray-900 dark:text-gray-100 tabular-nums">{totalWt}</span>
-                    <div className="flex">
-                      {(() => {
-                        const svc = commonValue(services);
-                        const opt = SERVICE_TYPE_OPTIONS.find(o => o.value === svc);
-                        return (
-                          <span className="text-[10px] font-bold text-gray-500 dark:text-navy-400 whitespace-nowrap">
-                            {opt ? opt.short : 'Mixed'}
-                          </span>
-                        );
-                      })()}
-                    </div>
                   </div>
                 </div>
               );
@@ -1298,13 +1298,13 @@ export default function ManifestDetailPage() {
                 )}
                 <div
                   {...dragProps}
-                  className={`grid grid-cols-[24px_190px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_100px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
+                  className={`grid grid-cols-[24px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
                     isGroupParent ? 'bg-blue-50/25 dark:bg-blue-950/10' : ''
                   } ${
                     selected ? 'bg-emerald-50/70 dark:bg-emerald-950/25' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
                   }`}
                 >
-                  <div className={`col-span-2 sticky left-0 z-10 -ml-4 pl-4 ${stickyBg} grid grid-cols-[24px_190px] gap-2 items-center`}>
+                  <div className={`col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[346px] ${stickyBg} grid grid-cols-[24px_190px_100px] gap-2 items-center`}>
                     <span className="text-gray-900 dark:text-gray-100 font-mono">{isGroupParent && groupExpanded ? '' : rowNumber}</span>
                     <div className="min-w-0 flex items-center gap-1.5">
                       <ChevronDown size={11} className={`text-gray-300 dark:text-navy-600 shrink-0 transition-transform ${selected ? 'rotate-0' : '-rotate-90'}`} />
@@ -1314,6 +1314,13 @@ export default function ManifestDetailPage() {
                       </span>
                       {job.dangerous_goods_notes && <TriangleAlert size={10} className="text-red-500 shrink-0" />}
                       {jobIdsWithUpdates.has(job.id) && <RefreshCw size={10} className="text-orange-500 shrink-0" />}
+                    </div>
+                    <div className="flex">
+                      <ServiceTypePicker
+                        value={job.job_service_type ?? ''}
+                        disabled={locked}
+                        onChange={value => updateServiceType(job.id, value)}
+                      />
                     </div>
                   </div>
                   <span className="inline-flex items-center gap-0.5 min-w-0 pl-2">
@@ -1334,13 +1341,6 @@ export default function ManifestDetailPage() {
                   <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.delivery_at ? formatTime(job.delivery_at) : '—'}</span>
                   <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.package_qty ?? '—'}</span>
                   <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.weight_kg ?? '—'}</span>
-                  <div className="flex">
-                    <ServiceTypePicker
-                      value={job.job_service_type ?? ''}
-                      disabled={locked}
-                      onChange={value => updateServiceType(job.id, value)}
-                    />
-                  </div>
                 </div>
 
                 <AnimatePresence initial={false}>
