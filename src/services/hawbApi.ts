@@ -38,6 +38,7 @@ export interface HawbJob {
   direction: string | null;
   special_handling: string | null;
   job_service_type: 'delivery' | 'collection' | 'collection_and_delivery' | null;
+  indigo_job_number: string | null;
   packages: HawbPackageLine[];
   extracted_data: Record<string, unknown>;
   source_kind: 'plain' | 'blind';
@@ -91,6 +92,7 @@ export interface HawbJobUpdate {
   direction?: string | null;
   special_handling?: string | null;
   job_service_type?: 'delivery' | 'collection' | 'collection_and_delivery' | null;
+  indigo_job_number?: string | null;
 }
 
 export interface HawbManifest {
@@ -112,6 +114,20 @@ export interface HawbManifest {
   created_at: string;
   hawb_numbers: string[];
   remarks: string | null;
+}
+
+// Indigo's AddJob response: one result per submitted job, in the same order
+// jobs were sent — server-built, see Horizon-Api's app/services/indigo_export.py.
+export interface IndigoJobResult {
+  JobGuid?: string | null;
+  JobNumber?: string | null;
+  JobReference?: string | null;
+  ErrorCode?: string | number | null;
+  Errormessage?: string | null;
+}
+
+export interface IndigoExportResult {
+  results: IndigoJobResult[];
 }
 
 export interface HawbManifestUpdate {
@@ -170,6 +186,14 @@ export const hawbApi = api.injectEndpoints({
       }),
       invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }],
     }),
+    indigoExportManifest: build.mutation<IndigoExportResult, { manifestId: string; service_type: string }>({
+      query: ({ manifestId, service_type }) => ({
+        url: `/hawb/manifests/${manifestId}/indigo-export`,
+        method: 'POST',
+        body: { service_type },
+      }),
+      invalidatesTags: (_r, _e, { manifestId }) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest', 'HawbJob'],
+    }),
     confirmManifest: build.mutation<HawbManifest, string>({
       query: (manifestId) => ({ url: `/hawb/manifests/${manifestId}/confirm`, method: 'POST' }),
       invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest'],
@@ -220,6 +244,7 @@ export const {
   useUpdateHawbManifestMutation,
   useReorderManifestJobsMutation,
   useExportManifestMutation,
+  useIndigoExportManifestMutation,
   useConfirmManifestMutation,
   useHoldManifestMutation,
   useMarkManifestExportedMutation,

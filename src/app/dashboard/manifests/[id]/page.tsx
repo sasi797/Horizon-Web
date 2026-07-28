@@ -13,6 +13,7 @@ import {
   useCancelManifestMutation,
   useReopenManifestMutation,
   useRetryManifestExtractionMutation,
+  useIndigoExportManifestMutation,
   useGetJobUpdatesQuery,
   useApplyJobUpdateMutation,
   type HawbJob,
@@ -48,174 +49,12 @@ const MANIFEST_STATUS_LABEL: Record<string, string> = {
   failed: 'Extraction Failed',
 };
 
-// Stub list — real account numbers (keyed off the collection address) are pending; swap this
-// out once the actual list is provided.
-const ACCOUNT_NUMBER_OPTIONS = [
-  { value: 'PS0011', label: 'PS0011' },
-  { value: 'PS0022', label: 'PS0022' },
-  { value: 'PS0033', label: 'PS0033' },
-];
-
-const VEHICLE_SIZE_OPTIONS = [
-  { value: 'small_van', label: 'Small Van' },
-  { value: 'short_wheel_base', label: 'Short wheel base' },
-  { value: 'long_wheel_base', label: 'Long wheel base' },
-];
-
-// Indigo's real ServiceType codes for the AddJob payload.
-const INDIGO_SERVICE_TYPE_OPTIONS = [
-  { value: 'Sameday', label: 'Sameday' },
-  { value: 'Overnight Parcels', label: 'Overnight Parcels' },
-];
-
 // Manifest-level fields Indigo's AddJob needs that we don't have a home for
 // yet — captured locally on this page only (see indigoFields state) since
 // the backend's HawbManifestUpdate type doesn't have columns for these.
-// ServiceType/VehicleType stay free-text inputs until Indigo hands over
-// their real code lists; at that point these become dropdowns.
 type IndigoFields = {
   service_type: string;
 };
-
-// Matches formatTime()'s approach below: these timestamps are stored and
-// displayed as literal wall-clock strings everywhere else in this app, never
-// timezone-converted. Parsing through `new Date()` + local getters here would
-// silently shift the hour by the browser's UTC offset — extract the
-// components directly from the string instead, same as the display does.
-function toIndigoDateTime(value: string | null): string {
-  if (!value) return '';
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
-  if (!match) return '';
-  const [, year, month, day, hour, minute, second = '00'] = match;
-  return `${year}-${month}-${day}T${hour}:${minute}:${second}.000`;
-}
-
-// Per the Indigo docs: the X-Indigo-Access-Token header value is
-// Base64("username:password").
-function buildIndigoAccessToken(username: string, password: string): string {
-  if (!username || !password) return '';
-  return btoa(`${username}:${password}`);
-}
-
-// SPLTEST sandbox account, provided by Indigo/NPA for testing this
-// integration — NOT a production credential, but real enough to log a
-// genuinely correct url/token pair on every Export click without retyping
-// horizonIndigoRequest(...) in the console each time. Remove/replace before
-// this ever points at a live account.
-const INDIGO_TEST_CONNECTION = {
-  baseUrl: 'https://apps.neilporterassociates.co.uk/iWebService/V1',
-  username: 'SPLTEST',
-  password: 'SPLTest123!',
-};
-
-// cityLine() falls back to '—' for missing data — fine for on-screen display,
-// but that placeholder has no business ending up in an API payload.
-function addressCountry(value: string | null): string {
-  const line = cityLine(value);
-  return line === '—' ? '' : line;
-}
-
-// job.dimensions is free-text from PDF extraction (e.g. "30 x 20 x 15 cm"),
-// not three separate numbers — pull out up to three numbers in order.
-function parseDimensions(value: string | null): [number, number, number] {
-  const nums = value?.match(/\d+(\.\d+)?/g)?.map(Number) ?? [];
-  return [nums[0] ?? 0, nums[1] ?? 0, nums[2] ?? 0];
-}
-
-// Shape expected by Indigo's iWebService/V1/AddJob endpoint (see
-// "NPA Indigo Cloud API Integration" doc, and docs/indigo-addjob-integration.md
-// for the full field-by-field mapping notes). Auth (X-Indigo-Access-Token),
-// the live URL, and the ServiceType/VehicleType code lists still have to
-// come from the client before this can actually be POSTed — until then this
-// is built and downloaded locally so the field mapping can be reviewed.
-//
-// Remaining known gaps:
-// - ColAddress1 / DelAddress1: our shipper/consignee are single free-text
-//   blobs (from PDF extraction), not structured fields, so everything past
-//   the company name goes into Address1 as one string rather than being
-//   split across Address1-3 — long addresses risk exceeding Indigo's
-//   35-char limit there.
-// - ColTown / DelTown / ColPostcode / DelPostcode: parsed via
-//   cityAndPostcodeLine() off the "Town, Postcode" line that sits just
-//   before the country line — works for the address shapes seen so far, but
-//   isn't guaranteed for every format PDF extraction might produce.
-// - Dangerous goods: Indigo's schema has no hazmat/DG field at all, so
-//   job.dangerous_goods currently has nowhere to go in this payload.
-// - Merged groups (same collection+delivery route — see the "Merge" run-order
-//   view): Indigo's AddJob has no concept of "one job, many consignments", so
-//   a merged group becomes ONE Job with summed Packs/Weight. JobReference and
-//   ConsignmentNo can only hold one value each (STRING(35)/STRING(25)), so
-//   they carry the first HAWB in the group.
-function buildIndigoAddJobPayload(
-  indigoFields: IndigoFields,
-  manifestFields: { account_number: string; vehicle_size: string },
-  jobGroups: HawbJob[][],
-) {
-  return {
-    Jobs: {
-      Job: jobGroups.map(group => {
-        const job = group[0];
-        const [length, width, height] = parseDimensions(job.dimensions);
-        const colCityPostcode = cityAndPostcodeLine(job.shipper);
-        const delCityPostcode = cityAndPostcodeLine(job.consignee);
-        const totalPacks = group.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
-        const totalWeight = group.reduce((sum, j) => sum + (j.weight_kg ?? 0), 0);
-        const specialInsts = [...new Set(group.map(j => j.special_handling).filter(Boolean))].join(' — ');
-        return {
-          JobGuid: crypto.randomUUID().replace(/-/g, ''),
-          // Account number / vehicle size are the same value the manifest
-          // already collects (see the "Account number" / "Vehicle size"
-          // fields above) — no separate Indigo-specific input for these.
-          CustomerNumber: manifestFields.account_number,
-          ServiceType: indigoFields.service_type,
-          VehicleType: manifestFields.vehicle_size,
-          JobReference: job.hawb_number,
-          JobReference2: '',
-          BookedBy: '',
-          RequestedBy: 'Horizon Web',
-          ColDateTime: toIndigoDateTime(job.collection_at),
-          ColCompany: splitAddress(job.shipper).name,
-          ColContact: job.shipper_contact ?? '',
-          ColAddress1: splitAddress(job.shipper).address,
-          ColAddress2: '',
-          ColAddress3: '',
-          ColTown: colCityPostcode.town,
-          ColPostcode: colCityPostcode.postcode,
-          ColCountry: addressCountry(job.shipper),
-          ColTelephone: job.shipper_phone ?? '',
-          ColEmail: '',
-          ColInsts: '',
-          ColReadyAt: '',
-          ColPremisesClose: '',
-          DelDateTime: toIndigoDateTime(job.delivery_at),
-          DelCompany: splitAddress(job.consignee).name,
-          DelContact: job.consignee_contact ?? '',
-          DelAddress1: splitAddress(job.consignee).address,
-          DelAddress2: '',
-          DelAddress3: '',
-          DelTown: delCityPostcode.town,
-          DelPostcode: delCityPostcode.postcode,
-          DelCountry: addressCountry(job.consignee),
-          DelTelephone: job.consignee_phone ?? '',
-          DelInsts: '',
-          DelReadyAt: '',
-          DelPremisesClose: '',
-          Packs: totalPacks,
-          Weight: totalWeight,
-          SpecialInsts: specialInsts,
-          Length: length,
-          Width: width,
-          Height: height,
-          Fragile: 0,
-          Security: 0,
-          ConsignmentNo: job.hawb_number,
-          Insurance: 0,
-          InsuranceValue: 0,
-        };
-      }),
-    },
-  };
-}
 
 // collection_at/delivery_at are wall-clock times extracted from the HAWB PDF,
 // stored with a fake UTC tag purely to fit a timestamptz column (see
@@ -622,7 +461,10 @@ export default function ManifestDetailPage() {
   const [updateManifest] = useUpdateHawbManifestMutation();
   const [updateJob] = useUpdateHawbJobMutation();
   const [reorderJobs] = useReorderManifestJobsMutation();
+  const [indigoExportManifest] = useIndigoExportManifestMutation();
   const [payloadBuilt, setPayloadBuilt] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [cancelManifest, { isLoading: cancelling }] = useCancelManifestMutation();
   const [reopenManifest, { isLoading: reopening }] = useReopenManifestMutation();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -630,6 +472,9 @@ export default function ManifestDetailPage() {
   const [applyJobUpdate] = useApplyJobUpdateMutation();
   const { data: savedStartPoints = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'start_point' });
   const { data: savedEndPoints = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'end_point' });
+  const { data: savedAccountNumbers = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'account_number' });
+  const { data: savedServiceTypes = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'service_type' });
+  const { data: savedVehicleSizes = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'vehicle_size' });
 
   const [orderedJobs, setOrderedJobs] = useState<HawbJob[]>([]);
   const [syncedJobs, setSyncedJobs] = useState<HawbJob[] | undefined>(undefined);
@@ -715,38 +560,6 @@ export default function ManifestDetailPage() {
     if (group) group.push(job); else routeGroups.set(key, [job]);
   }
 
-  // Deliberately not a form on the page — credentials shouldn't sit in
-  // rendered UI/React state for something that isn't wired up to a real call
-  // yet. Instead, exposed as a console-only function: run
-  // horizonIndigoRequest(baseUrl, username, password) in DevTools to build
-  // and log the exact request (URL + auth header + body) for review/sign-off
-  // before anyone connects a live fetch. Still never sends anything.
-  useEffect(() => {
-    (window as unknown as Record<string, unknown>).horizonIndigoRequest = (baseUrl: string, username: string, password: string) => {
-      const jobGroups = Array.from(routeGroups.values());
-      const payload = buildIndigoAddJobPayload(indigoFields, manifestFields, jobGroups);
-      const url = `${baseUrl.replace(/\/+$/, '')}/AddJob`;
-      const token = buildIndigoAccessToken(username, password);
-      const request = {
-        method: 'POST',
-        url,
-        headers: {
-          'X-Indigo-Access-Token': token,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: payload,
-      };
-      // Three separate labeled lines — easier to read/screenshot for review
-      // than one nested object.
-      console.log('payload:', payload);
-      console.log('url:', url);
-      console.log('token:', token);
-      return request;
-    };
-    return () => { delete (window as unknown as Record<string, unknown>).horizonIndigoRequest; };
-  }, [indigoFields, manifestFields, routeGroups]);
-
   if (isLoading) {
     return <ManifestDetailSkeleton />;
   }
@@ -798,6 +611,9 @@ export default function ManifestDetailPage() {
       ...jobPointCandidates,
     ]).entries(),
   ).map(([value, label]) => ({ value, label }));
+  const accountNumberOptions = savedAccountNumbers.map(v => ({ value: v.value, label: v.label }));
+  const serviceTypeOptions = savedServiceTypes.map(v => ({ value: v.value, label: v.label }));
+  const vehicleSizeOptions = savedVehicleSizes.map(v => ({ value: v.value, label: v.label }));
   const withCurrentValue = (options: { value: string; label: string }[], current: string) =>
     !current || options.some(o => o.value === current) ? options : [{ value: current, label: current }, ...options];
 
@@ -854,27 +670,38 @@ export default function ManifestDetailPage() {
     saveJobField(jobId, 'job_service_type', value);
   };
 
-  const handleExport = () => {
-    // Same-route jobs (see routeGroups, used by the "Merge" run-order view)
-    // collapse into one Indigo Job on export — that's a fact about the
-    // physical run, not a display preference, so it applies regardless of
-    // whether List or Merge view happens to be selected right now.
-    const jobGroups = Array.from(routeGroups.values());
-    const payload = buildIndigoAddJobPayload(indigoFields, manifestFields, jobGroups);
-    const requestUrl = `${INDIGO_TEST_CONNECTION.baseUrl.replace(/\/+$/, '')}/AddJob`;
-    const requestToken = buildIndigoAccessToken(INDIGO_TEST_CONNECTION.username, INDIGO_TEST_CONNECTION.password);
-    console.log('payload:', payload);
-    console.log('url:', requestUrl);
-    console.log('token:', requestToken);
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${manifest.reference_number}-export-payload.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setPayloadBuilt(true);
-    setTimeout(() => setPayloadBuilt(false), 3000);
+  const handleExport = async () => {
+    // Indigo's API has no CORS support, so a direct browser → Indigo call is
+    // blocked outright — the payload is built and the AddJob request is made
+    // server-side instead (see Horizon-Api's app/services/indigo_export.py),
+    // keeping the account credentials out of the frontend bundle entirely.
+    setExporting(true);
+    setExportError(null);
+    try {
+      const { results } = await indigoExportManifest({
+        manifestId: manifest.id,
+        service_type: indigoFields.service_type,
+      }).unwrap();
+
+      // Per Indigo's doc, JobNumber is only populated "on success" — a
+      // rejection can come back with ErrorCode left null and only
+      // Errormessage set (seen live: "Invalid Customer Number"), so checking
+      // ErrorCode alone would have silently reported this as a success.
+      const failed = results.filter(r => !r.JobNumber);
+      if (failed.length > 0) {
+        setExportError(
+          `${failed.length} of ${results.length} job(s) were rejected by Indigo: ${failed.map(f => f.Errormessage || `error ${f.ErrorCode ?? 'unknown'}`).join('; ')}`
+        );
+      } else {
+        setPayloadBuilt(true);
+        setTimeout(() => setPayloadBuilt(false), 3000);
+      }
+    } catch (err) {
+      const detail = (err as { data?: { detail?: string } })?.data?.detail;
+      setExportError(detail ?? 'Export failed');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const confirmCancel = async () => {
@@ -950,13 +777,13 @@ export default function ManifestDetailPage() {
             >
               <button
                 onClick={handleExport}
-                disabled={missingExportFields.length > 0}
+                disabled={missingExportFields.length > 0 || exporting}
                 className="flex items-center gap-1.5 text-[11.5px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 disabled:opacity-60 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
               >
                 <span className="flex items-center justify-center w-4 h-4 rounded bg-emerald-100 dark:bg-emerald-900/40">
                   <FileDown size={11} strokeWidth={2.25} />
                 </span>
-                {payloadBuilt ? 'Payload built ✓' : 'Export manifest'}
+                {exporting ? 'Exporting…' : payloadBuilt ? 'Exported ✓' : 'Export manifest'}
               </button>
             </Tooltip>
           )}
@@ -974,6 +801,16 @@ export default function ManifestDetailPage() {
           )}
         </div>
       </motion.div>
+
+      {exportError && (
+        <motion.div
+          variants={staggerItem}
+          className="flex items-start gap-2 text-[11.5px] font-medium text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 rounded-xl px-3 py-2"
+        >
+          <TriangleAlert size={13} className="shrink-0 mt-0.5" />
+          <span>{exportError}</span>
+        </motion.div>
+      )}
 
       <ConfirmDialog
         open={showCancelConfirm}
@@ -1074,7 +911,7 @@ export default function ManifestDetailPage() {
               value={manifestFields.account_number}
               emptyLabel="Empty"
               tag="gray"
-              options={withCurrentValue(ACCOUNT_NUMBER_OPTIONS, manifestFields.account_number)}
+              options={withCurrentValue(accountNumberOptions, manifestFields.account_number)}
               onChange={value => {
                 setManifestFields(f => ({ ...f, account_number: value }));
                 saveManifestField('account_number', value);
@@ -1088,7 +925,7 @@ export default function ManifestDetailPage() {
               value={indigoFields.service_type}
               emptyLabel="Empty"
               tag="blue"
-              options={withCurrentValue(INDIGO_SERVICE_TYPE_OPTIONS, indigoFields.service_type)}
+              options={withCurrentValue(serviceTypeOptions, indigoFields.service_type)}
               onChange={value => setIndigoFields(f => ({ ...f, service_type: value }))}
             />
           </div>
@@ -1099,7 +936,7 @@ export default function ManifestDetailPage() {
               value={manifestFields.vehicle_size}
               emptyLabel="Empty"
               tag="purple"
-              options={withCurrentValue(VEHICLE_SIZE_OPTIONS, manifestFields.vehicle_size)}
+              options={withCurrentValue(vehicleSizeOptions, manifestFields.vehicle_size)}
               onChange={value => {
                 setManifestFields(f => ({ ...f, vehicle_size: value }));
                 saveManifestField('vehicle_size', value);
@@ -1354,16 +1191,25 @@ export default function ManifestDetailPage() {
                       className="overflow-hidden bg-gray-50/40 dark:bg-navy-950/20 border-t border-gray-100 dark:border-navy-800"
                     >
                       <div className="px-4 py-4 space-y-6 max-w-4xl">
-                        {job.blind_pdf_url && (
-                          <div className="flex items-center justify-end">
-                            <Tooltip content="View the companion MF-PCS PDF used to fill in redacted fields" side="bottom">
-                              <button
-                                onClick={() => window.open(job.blind_pdf_url!, '_blank', 'noopener,noreferrer')}
-                                className="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-full hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors"
-                              >
-                                <ExternalLink size={11} /> MF-PCS View PDF
-                              </button>
-                            </Tooltip>
+                        {(job.blind_pdf_url || job.indigo_job_number) && (
+                          <div className="flex items-center justify-end gap-2">
+                            {job.indigo_job_number && (
+                              <Tooltip content="Indigo's own reference for this job, returned from AddJob" side="bottom">
+                                <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full">
+                                  <Hash size={11} /> Indigo Job {job.indigo_job_number}
+                                </span>
+                              </Tooltip>
+                            )}
+                            {job.blind_pdf_url && (
+                              <Tooltip content="View the companion MF-PCS PDF used to fill in redacted fields" side="bottom">
+                                <button
+                                  onClick={() => window.open(job.blind_pdf_url!, '_blank', 'noopener,noreferrer')}
+                                  className="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-full hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors"
+                                >
+                                  <ExternalLink size={11} /> MF-PCS View PDF
+                                </button>
+                              </Tooltip>
+                            )}
                           </div>
                         )}
 
