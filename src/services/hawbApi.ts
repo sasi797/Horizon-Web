@@ -128,6 +128,7 @@ export interface IndigoJobResult {
 
 export interface IndigoExportResult {
   results: IndigoJobResult[];
+  payload?: Record<string, unknown> | null;
 }
 
 export interface HawbManifestUpdate {
@@ -186,13 +187,16 @@ export const hawbApi = api.injectEndpoints({
       }),
       invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }],
     }),
-    indigoExportManifest: build.mutation<IndigoExportResult, { manifestId: string; service_type: string }>({
-      query: ({ manifestId, service_type }) => ({
+    indigoExportManifest: build.mutation<IndigoExportResult, { manifestId: string; service_type: string; dry_run?: boolean }>({
+      query: ({ manifestId, service_type, dry_run }) => ({
         url: `/hawb/manifests/${manifestId}/indigo-export`,
         method: 'POST',
-        body: { service_type },
+        body: { service_type, dry_run },
       }),
-      invalidatesTags: (_r, _e, { manifestId }) => [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest', 'HawbJob'],
+      // A dry run only builds and returns the payload — nothing on the
+      // manifest/jobs actually changed, so nothing needs refetching.
+      invalidatesTags: (_r, _e, { manifestId, dry_run }) =>
+        dry_run ? [] : [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest', 'HawbJob'],
     }),
     confirmManifest: build.mutation<HawbManifest, string>({
       query: (manifestId) => ({ url: `/hawb/manifests/${manifestId}/confirm`, method: 'POST' }),

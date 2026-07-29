@@ -579,6 +579,8 @@ export default function ManifestDetailPage() {
   const jobIdsWithUpdates = new Set(jobUpdates.map(u => u.job_id));
   const jobsMissingService = orderedJobs.filter(j => !j.job_service_type).length;
   const missingExportFields = [
+    !manifestFields.start_point && 'Start point',
+    !manifestFields.end_point && 'End point',
     !manifestFields.job_reference && 'Job reference',
     !manifestFields.account_number && 'Account number',
     !manifestFields.vehicle_size && 'Vehicle size',
@@ -879,7 +881,7 @@ export default function ManifestDetailPage() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-x-3.5 gap-y-2.5 pt-3 border-t border-dashed border-gray-200 dark:border-navy-800">
           <div className="min-w-0">
-            <PropLabel icon={Navigation} iconTone={ROW2_ICON_TONE}>Start point</PropLabel>
+            <PropLabel icon={Navigation} iconTone={ROW2_ICON_TONE} required>Start point</PropLabel>
             <LocationSelect
               disabled={locked}
               value={manifestFields.start_point}
@@ -892,7 +894,7 @@ export default function ManifestDetailPage() {
             />
           </div>
           <div className="min-w-0">
-            <PropLabel icon={Flag} iconTone={ROW2_ICON_TONE}>End point</PropLabel>
+            <PropLabel icon={Flag} iconTone={ROW2_ICON_TONE} required>End point</PropLabel>
             <LocationSelect
               disabled={locked}
               value={manifestFields.end_point}
