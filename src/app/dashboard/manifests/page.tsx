@@ -69,6 +69,7 @@ const TABLE_COLUMNS = [
   { label: 'Extract', icon: FileSearch },
   { label: 'Remarks', icon: MessageSquare },
   { label: 'Jobs', icon: Hash },
+  { label: 'Indigo Job No', icon: Hash },
   { label: 'HAWB Numbers', icon: Hash },
   { label: 'Total Weight (kg)', icon: Hash },
   { label: 'Operator', icon: User },
@@ -237,6 +238,9 @@ function ManifestsTableSkeleton() {
                 </td>
                 <td className="px-2 py-2.5 border-r border-gray-200 dark:border-navy-700">
                   <Skel className="w-4 h-3.5" />
+                </td>
+                <td className="px-2 py-2.5 border-r border-gray-200 dark:border-navy-700">
+                  <Skel className="w-16 h-3.5" />
                 </td>
                 <td className="px-2 py-2.5 border-r border-gray-200 dark:border-navy-700">
                   <div className="flex items-center gap-1">
@@ -466,6 +470,9 @@ export default function ManifestsPage() {
                       )}
                     </td>
                     <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] font-medium text-gray-700 dark:text-navy-200">{isPending ? '—' : m.job_count}</td>
+                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] font-mono text-gray-700 dark:text-navy-200">
+                      {m.indigo_job_number ?? <span className="text-gray-300 dark:text-navy-600 font-sans">—</span>}
+                    </td>
                     <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 max-w-[280px]">
                       {isPending ? <span className="text-[12px] text-gray-400 dark:text-navy-500">—</span> : <HawbNumbersCell hawbNumbers={m.hawb_numbers} />}
                     </td>
