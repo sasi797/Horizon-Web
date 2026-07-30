@@ -22,7 +22,7 @@ import {
 import ApiErrorState from '@/components/ApiErrorState';
 import Tooltip from '@/components/Tooltip';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import { splitAddress, cityLine, cityAndPostcodeLine } from '@/lib/hawbFormat';
+import { splitAddress, cityLine, cityAndPostcodeLine, parseAddressParts, buildAddress, type AddressParts } from '@/lib/hawbFormat';
 import { useGetDropdownValuesQuery } from '@/services/dropdownApi';
 
 const MANIFEST_STATUS_BADGE: Record<string, string> = {
@@ -271,8 +271,64 @@ function Section({
   );
 }
 
+function AddressFields({
+  value, locked, onChange, onSave,
+}: {
+  value: string;
+  locked: boolean;
+  onChange: (raw: string) => void;
+  onSave: (raw: string) => void;
+}) {
+  const [parts, setParts] = useState<AddressParts>(() => parseAddressParts(value));
+
+  const update = (patch: Partial<AddressParts>) => {
+    const next = { ...parts, ...patch };
+    setParts(next);
+    onChange(buildAddress(next));
+  };
+
+  const commit = () => onSave(buildAddress(parts));
+
+  return (
+    <div className="space-y-3">
+      <Field label="Company Name">
+        <input disabled={locked} value={parts.name}
+          onChange={e => update({ name: e.target.value })}
+          onBlur={commit}
+          className={inputClass(locked)} />
+      </Field>
+      <Field label="Address">
+        <textarea disabled={locked} value={parts.address} rows={2}
+          onChange={e => update({ address: e.target.value })}
+          onBlur={commit}
+          className={inputClass(locked)} />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Town">
+          <input disabled={locked} value={parts.town}
+            onChange={e => update({ town: e.target.value })}
+            onBlur={commit}
+            className={inputClass(locked)} />
+        </Field>
+        <Field label="Postcode">
+          <input disabled={locked} value={parts.postcode}
+            onChange={e => update({ postcode: e.target.value })}
+            onBlur={commit}
+            className={inputClass(locked)} />
+        </Field>
+      </div>
+      <Field label="Country">
+        <input disabled={locked} value={parts.country}
+          onChange={e => update({ country: e.target.value })}
+          onBlur={commit}
+          className={inputClass(locked)} />
+      </Field>
+    </div>
+  );
+}
+
 function inputClass(locked: boolean) {
-  return `w-full text-[13px] border border-gray-200 dark:border-navy-700 rounded-xl px-3 py-1.5 bg-gray-50/60 dark:bg-navy-800/60 text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-300 dark:focus:border-emerald-600 focus:bg-white dark:focus:bg-navy-800 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/40 transition-all ${
+  return `w-full text-[13px] border border-gray-200 dark:border-navy-700 rounded-xl px-3 py-1.5 bg-gray-50/60 dark:bg-navy-800/60 text-black dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-300 dark:focus:border-emerald-600 focus:bg-white dark:focus:bg-navy-800 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/40 transition-all ${
     locked ? 'opacity-60 cursor-not-allowed' : ''
   }`;
 }
@@ -1221,23 +1277,21 @@ export default function ManifestDetailPage() {
                         {/* Shipper / Consignee */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <Section icon={MapPin} title="Shipper">
-                            <textarea
-                              disabled={locked}
+                            <AddressFields
+                              key={job.id}
                               value={jobForm.shipper}
-                              onChange={e => setJobForm(f => f && ({ ...f, shipper: e.target.value }))}
-                              onBlur={e => saveJobField(job.id, 'shipper', e.target.value || null)}
-                              rows={5}
-                              className={inputClass(locked)}
+                              locked={locked}
+                              onChange={raw => setJobForm(f => f && ({ ...f, shipper: raw }))}
+                              onSave={raw => saveJobField(job.id, 'shipper', raw || null)}
                             />
                           </Section>
                           <Section icon={Building2} title="Consignee">
-                            <textarea
-                              disabled={locked}
+                            <AddressFields
+                              key={job.id}
                               value={jobForm.consignee}
-                              onChange={e => setJobForm(f => f && ({ ...f, consignee: e.target.value }))}
-                              onBlur={e => saveJobField(job.id, 'consignee', e.target.value || null)}
-                              rows={5}
-                              className={inputClass(locked)}
+                              locked={locked}
+                              onChange={raw => setJobForm(f => f && ({ ...f, consignee: raw }))}
+                              onSave={raw => saveJobField(job.id, 'consignee', raw || null)}
                             />
                           </Section>
                         </div>
@@ -1476,7 +1530,7 @@ export default function ManifestDetailPage() {
                                 <div className="overflow-x-auto">
                                   <table className="w-full text-[11.5px] border-collapse">
                                     <thead>
-                                      <tr className="bg-gray-50/80 dark:bg-navy-800/80">
+                                      <tr className="bg-gray-100 dark:bg-navy-800/80">
                                         <th className="text-left font-bold text-gray-500 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2 w-7">#</th>
                                         <th className="text-left font-bold text-gray-500 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Supplier</th>
                                         <th className="text-left font-bold text-gray-500 dark:text-navy-500 uppercase tracking-wide text-[9.5px] px-3 py-2">Type</th>
