@@ -181,12 +181,15 @@ export default function Sidebar({
                   <Link href="/dashboard/manifests" onClick={onClose} className="no-underline">
                     <motion.div
                       variants={staggerItem}
-                      className={`flex items-center gap-2 px-1 py-1 rounded-md transition-colors cursor-pointer ${
+                      className={`relative flex items-center gap-2 pl-1.5 pr-1 py-1 rounded-md transition-colors cursor-pointer ${
                         isActive('/dashboard/manifests')
                           ? 'bg-gray-200/70 dark:bg-white/10'
                           : 'hover:bg-gray-200/70 dark:hover:bg-white/5'
                       }`}
                     >
+                      {isActive('/dashboard/manifests') && (
+                        <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-emerald-500" />
+                      )}
                       <span className="flex-shrink-0 w-[22px] h-[22px] rounded-full flex items-center justify-center bg-emerald-500 text-white">
                         <PackageCheck size={13} strokeWidth={2} />
                       </span>
@@ -206,12 +209,15 @@ export default function Sidebar({
                     <Link key={label} href={href} onClick={onClose} className="no-underline">
                       <motion.div
                         variants={staggerItem}
-                        className={`flex items-center gap-2 px-1 py-1 rounded-md transition-colors cursor-pointer ${
+                        className={`relative flex items-center gap-2 pl-1.5 pr-1 py-1 rounded-md transition-colors cursor-pointer ${
                           isActive(href)
                             ? 'bg-gray-200/70 dark:bg-white/10'
                             : 'hover:bg-gray-200/70 dark:hover:bg-white/5'
                         }`}
                       >
+                        {isActive(href) && (
+                          <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-emerald-500" />
+                        )}
                         <span className={`flex-shrink-0 w-[22px] h-[22px] rounded-md flex items-center justify-center ${color}`}>
                           <Icon size={13} strokeWidth={2} />
                         </span>
