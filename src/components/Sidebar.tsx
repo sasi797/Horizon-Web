@@ -216,7 +216,7 @@ export default function Sidebar({
                         }`}
                       >
                         {isActive(href) && (
-                          <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-emerald-500" />
+                          <span className={`absolute left-0 top-1 bottom-1 w-[3px] rounded-full ${color.split(' ')[0]}`} />
                         )}
                         <span className={`flex-shrink-0 w-[22px] h-[22px] rounded-md flex items-center justify-center ${color}`}>
                           <Icon size={13} strokeWidth={2} />
