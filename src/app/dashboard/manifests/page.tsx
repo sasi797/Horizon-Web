@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as Rea
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Package, CalendarDays, RefreshCw, CaseSensitive, CircleDot, Hash, User, File, Search, X, CheckCircle2, FileSearch, MessageSquare, History } from 'lucide-react';
+import { ChevronRight, ChevronLeft, ChevronDown, Check, Package, CalendarDays, RefreshCw, CaseSensitive, CircleDot, Hash, User, File, Search, X, CheckCircle2, FileSearch, MessageSquare, History, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestsQuery, useGetJobUpdatesQuery, useGetProcessingDocumentsQuery, useRetryManifestExtractionMutation,
@@ -70,18 +70,23 @@ const STATUS_LABEL: Record<string, string> = {
   ignored: 'Ignored',
 };
 
-const TABLE_COLUMNS = [
-  { label: 'Reference', icon: CaseSensitive },
-  { label: 'Status', icon: CircleDot },
+type SortKey = 'reference_number' | 'status' | 'job_count' | 'indigo_job_number' | 'total_weight_kg' | 'created_by_name' | 'created_at';
+
+// Extract and HAWB Numbers have no single scalar to compare, so they're display-only columns.
+const TABLE_COLUMNS: { label: string; icon: typeof CaseSensitive; sortKey?: SortKey }[] = [
+  { label: 'Reference', icon: CaseSensitive, sortKey: 'reference_number' },
+  { label: 'Status', icon: CircleDot, sortKey: 'status' },
   { label: 'Extract', icon: FileSearch },
   { label: 'Remarks', icon: MessageSquare },
-  { label: 'Jobs', icon: Hash },
-  { label: 'Indigo Job No', icon: Hash },
+  { label: 'Jobs', icon: Hash, sortKey: 'job_count' },
+  { label: 'Indigo Job No', icon: Hash, sortKey: 'indigo_job_number' },
   { label: 'HAWB Numbers', icon: Hash },
-  { label: 'Total Weight (kg)', icon: Hash },
-  { label: 'Operator', icon: User },
-  { label: 'Created', icon: CalendarDays },
+  { label: 'Total Weight (kg)', icon: Hash, sortKey: 'total_weight_kg' },
+  { label: 'Operator', icon: User, sortKey: 'created_by_name' },
+  { label: 'Created', icon: CalendarDays, sortKey: 'created_at' },
 ];
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
 const HAWB_PREVIEW_COUNT = 2;
 
@@ -204,6 +209,73 @@ function HawbNumbersCell({ hawbNumbers }: { hawbNumbers: string[] }) {
   );
 }
 
+function PageSizeSelect({ value, options, onChange }: { value: number; options: number[]; onChange: (value: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={`inline-flex items-center gap-1.5 h-7 pl-2.5 pr-2 rounded-md border text-[11.5px] font-semibold transition-colors ${
+          open
+            ? 'border-emerald-500/60 text-gray-900 dark:text-gray-100'
+            : 'border-gray-200 dark:border-navy-700 text-gray-700 dark:text-navy-200 hover:border-gray-300 dark:hover:border-navy-600'
+        }`}
+      >
+        {value}
+        <ChevronDown size={12} className={`text-gray-400 dark:text-navy-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.12, ease: 'easeOut' }}
+            className="absolute z-20 bottom-full right-0 mb-1.5 w-16 bg-white dark:bg-navy-800 border border-gray-100 dark:border-navy-700 rounded-xl shadow-lg py-1"
+          >
+            {options.map(n => {
+              const isSelected = n === value;
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => { onChange(n); setOpen(false); }}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[12px] transition-colors ${
+                    isSelected
+                      ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold'
+                      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-navy-700'
+                  }`}
+                >
+                  {n}
+                  {isSelected && <Check size={12} className="shrink-0" />}
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function Skel({ className = '' }: { className?: string }) {
   return <span className={`block animate-pulse rounded-md bg-gray-100 dark:bg-navy-800 ${className}`} />;
 }
@@ -218,7 +290,7 @@ function ManifestsTableSkeleton() {
               {TABLE_COLUMNS.map(({ label, icon: Icon }, i) => (
                 <th
                   key={label}
-                  className={`px-4 pb-2.5 text-[12px] font-medium text-gray-500 dark:text-navy-400 whitespace-nowrap ${i < TABLE_COLUMNS.length - 1 ? 'border-r border-gray-200 dark:border-navy-700' : ''}`}
+                  className={`px-4 pt-3 pb-2.5 text-[12px] font-medium text-gray-500 dark:text-navy-400 whitespace-nowrap ${i < TABLE_COLUMNS.length - 1 ? 'border-r border-gray-200 dark:border-navy-700' : ''}`}
                 >
                   <span className="inline-flex items-center gap-1.5">
                     <Icon size={13} strokeWidth={1.8} className="text-gray-400 dark:text-navy-500" />
@@ -291,7 +363,19 @@ export default function ManifestsPage() {
   const processingDocs = allProcessingDocs.filter(d => d.source_kind === 'blind');
   useManifestsLiveRefresh();
   const [search, setSearch] = useState('');
+  const [statusTab, setStatusTab] = useState<'all' | 'open' | 'pending' | 'exported'>('all');
+  const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>(null);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
+  const [page, setPage] = useState(0);
   const [retryExtraction, { isLoading: retrying, originalArgs: retryingManifestId }] = useRetryManifestExtractionMutation();
+
+  const toggleSort = (key: SortKey) => {
+    setSort(prev => {
+      if (!prev || prev.key !== key) return { key, dir: 'asc' };
+      return prev.dir === 'asc' ? { key, dir: 'desc' } : null;
+    });
+    setPage(0);
+  };
 
   const pendingUpdateCounts = new Map<string, number>();
   for (const u of jobUpdates) {
@@ -300,12 +384,34 @@ export default function ManifestsPage() {
     pendingUpdateCounts.set(manifestId, (pendingUpdateCounts.get(manifestId) ?? 0) + 1);
   }
 
+  // "Pending" here mirrors the Status column's own Pending badge (m.status
+  // extracting/failed) rather than the separate 'pending_review' status —
+  // that's what the badge actually reads for the rows this tab is meant to catch.
+  const STATUS_TABS: { key: typeof statusTab; label: string; match: (m: (typeof manifests)[number]) => boolean }[] = [
+    { key: 'all', label: 'All', match: () => true },
+    { key: 'open', label: 'Open', match: m => m.status === 'open' },
+    { key: 'pending', label: 'Pending', match: m => m.status === 'extracting' || m.status === 'failed' },
+    { key: 'exported', label: 'Exported', match: m => m.status === 'exported' },
+  ];
+  const statusFilteredManifests = manifests.filter(STATUS_TABS.find(t => t.key === statusTab)!.match);
+
   const q = search.trim().toLowerCase();
-  const filteredManifests = !q ? manifests : manifests.filter(m =>
+  const filteredManifests = !q ? statusFilteredManifests : statusFilteredManifests.filter(m =>
     m.reference_number.toLowerCase().includes(q) ||
     (m.created_by_name ?? 'system').toLowerCase().includes(q) ||
     m.hawb_numbers.some(h => h.toLowerCase().includes(q))
   );
+
+  const sortedManifests = sort ? [...filteredManifests].sort((a, b) => {
+    const av = a[sort.key] ?? (typeof a[sort.key] === 'number' ? 0 : '');
+    const bv = b[sort.key] ?? (typeof b[sort.key] === 'number' ? 0 : '');
+    const cmp = typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv));
+    return sort.dir === 'asc' ? cmp : -cmp;
+  }) : filteredManifests;
+
+  const totalPages = Math.max(1, Math.ceil(sortedManifests.length / pageSize));
+  const clampedPage = Math.min(page, totalPages - 1);
+  const pagedManifests = sortedManifests.slice(clampedPage * pageSize, clampedPage * pageSize + pageSize);
 
   return (
     <motion.div variants={pageTransition} initial="hidden" animate="visible" className="space-y-4">
@@ -318,7 +424,7 @@ export default function ManifestsPage() {
             <h1 className="text-base font-black text-gray-900 dark:text-gray-100 leading-tight">Manifests</h1>
             <p className="text-[11px] text-gray-400 dark:text-navy-500 mt-0.5">
               {filteredManifests.length} manifest{filteredManifests.length === 1 ? '' : 's'}
-              {q && manifests.length !== filteredManifests.length ? ` of ${manifests.length}` : ''} — track jobs, weight, and export status in one place
+              {manifests.length !== filteredManifests.length ? ` of ${manifests.length}` : ''} — track jobs, weight, and export status in one place
             </p>
           </div>
         </div>
@@ -336,7 +442,7 @@ export default function ManifestsPage() {
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
               placeholder="Search reference, HAWB, operator…"
               aria-label="Search manifests"
               className="w-64 h-8 pl-8 pr-7 bg-transparent border-0 border-b border-gray-200 dark:border-navy-700 text-[12px] text-gray-700 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
@@ -344,7 +450,7 @@ export default function ManifestsPage() {
             {search && (
               <button
                 type="button"
-                onClick={() => setSearch('')}
+                onClick={() => { setSearch(''); setPage(0); }}
                 aria-label="Clear search"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-300 dark:text-navy-600 hover:text-gray-500 dark:hover:text-navy-400 transition-colors"
               >
@@ -353,6 +459,30 @@ export default function ManifestsPage() {
             )}
           </div>
         </div>
+      </motion.div>
+
+      <motion.div variants={staggerItem} className="inline-flex items-center gap-1 p-1 bg-gray-100 dark:bg-navy-800/60 rounded-lg w-fit">
+        {STATUS_TABS.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => { setStatusTab(key); setPage(0); }}
+            className={`relative px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors ${
+              statusTab === key
+                ? 'text-gray-900 dark:text-gray-100'
+                : 'text-gray-500 dark:text-navy-400 hover:text-gray-700 dark:hover:text-navy-200'
+            }`}
+          >
+            {statusTab === key && (
+              <motion.span
+                layoutId="manifest-status-tab-bg"
+                className="absolute inset-0 bg-white dark:bg-navy-900 rounded-md shadow-sm"
+                transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+              />
+            )}
+            <span className="relative z-10">{label}</span>
+          </button>
+        ))}
       </motion.div>
 
       {processingDocs.length > 0 && (
@@ -367,20 +497,36 @@ export default function ManifestsPage() {
       ) : isError ? (
         <ApiErrorState title="Failed to load manifests" onRetry={refetch} />
       ) : (
-        <motion.div variants={staggerItem} className="bg-white dark:bg-navy-900">
-          <div className="overflow-x-auto">
+        <motion.div variants={staggerItem} className="bg-white dark:bg-navy-900 border border-gray-100 dark:border-navy-800 rounded-2xl overflow-hidden">
+          <div className="overflow-auto max-h-[78vh]">
             <table className="w-full text-left border-collapse">
-              <thead>
+              <thead className="sticky top-0 z-20 bg-white dark:bg-navy-900">
                 <tr className="border-b border-gray-200 dark:border-navy-700">
-                  {TABLE_COLUMNS.map(({ label, icon: Icon }, i) => (
+                  {TABLE_COLUMNS.map(({ label, icon: Icon, sortKey }, i) => (
                     <th
                       key={label}
-                      className={`px-4 pb-2.5 text-[12px] font-medium text-gray-500 dark:text-navy-400 whitespace-nowrap ${i < TABLE_COLUMNS.length - 1 ? 'border-r border-gray-200 dark:border-navy-700' : ''}`}
+                      className={`px-4 pt-3 pb-2.5 text-[12px] font-medium text-gray-500 dark:text-navy-400 whitespace-nowrap ${i < TABLE_COLUMNS.length - 1 ? 'border-r border-gray-200 dark:border-navy-700' : ''}`}
                     >
-                      <span className="inline-flex items-center gap-1.5">
-                        <Icon size={13} strokeWidth={1.8} className="text-gray-400 dark:text-navy-500" />
-                        {label}
-                      </span>
+                      {sortKey ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleSort(sortKey)}
+                          className="inline-flex items-center gap-1.5 hover:text-gray-700 dark:hover:text-navy-200 transition-colors"
+                        >
+                          <Icon size={13} strokeWidth={1.8} className="text-gray-400 dark:text-navy-500" />
+                          {label}
+                          {sort?.key === sortKey ? (
+                            sort.dir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />
+                          ) : (
+                            <ArrowUpDown size={11} className="text-gray-300 dark:text-navy-600" />
+                          )}
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Icon size={13} strokeWidth={1.8} className="text-gray-400 dark:text-navy-500" />
+                          {label}
+                        </span>
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -389,11 +535,11 @@ export default function ManifestsPage() {
                 {filteredManifests.length === 0 && (
                   <tr>
                     <td colSpan={TABLE_COLUMNS.length} className="h-48 text-center text-gray-300 dark:text-navy-600 text-sm">
-                      {q ? 'No manifests match your search' : 'No manifests yet'}
+                      {q || statusTab !== 'all' ? 'No manifests match your filters' : 'No manifests yet'}
                     </td>
                   </tr>
                 )}
-                {filteredManifests.map((m) => {
+                {pagedManifests.map((m) => {
                   const isExtracting = m.status === 'extracting';
                   const isFailed = m.status === 'failed';
                   const isIgnored = m.status === 'ignored';
@@ -504,6 +650,44 @@ export default function ManifestsPage() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          <div className="flex items-center justify-end px-4 py-2.5 border-t border-gray-200 dark:border-navy-700 text-[11.5px] text-gray-500 dark:text-navy-400">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span>Rows per page</span>
+                <PageSizeSelect
+                  value={pageSize}
+                  options={PAGE_SIZE_OPTIONS}
+                  onChange={(n) => { setPageSize(n); setPage(0); }}
+                />
+              </div>
+              <span>
+                {sortedManifests.length === 0
+                  ? '0 of 0'
+                  : `${clampedPage * pageSize + 1}–${Math.min((clampedPage + 1) * pageSize, sortedManifests.length)} of ${sortedManifests.length}`}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={clampedPage === 0}
+                  onClick={() => setPage(p => Math.max(0, p - 1))}
+                  aria-label="Previous page"
+                  className="p-1 rounded-md text-gray-400 dark:text-navy-500 hover:text-gray-700 dark:hover:text-navy-200 hover:bg-gray-50 dark:hover:bg-navy-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:disabled:hover:text-navy-500 transition-colors"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <button
+                  type="button"
+                  disabled={clampedPage >= totalPages - 1}
+                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                  aria-label="Next page"
+                  className="p-1 rounded-md text-gray-400 dark:text-navy-500 hover:text-gray-700 dark:hover:text-navy-200 hover:bg-gray-50 dark:hover:bg-navy-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:disabled:hover:text-navy-500 transition-colors"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
           </div>
         </motion.div>
       )}
