@@ -531,7 +531,7 @@ export default function ManifestsPage() {
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody key={`${statusTab}-${sort?.key ?? 'none'}-${sort?.dir ?? ''}-${clampedPage}-${pageSize}`}>
                 {filteredManifests.length === 0 && (
                   <tr>
                     <td colSpan={TABLE_COLUMNS.length} className="h-48 text-center text-gray-300 dark:text-navy-600 text-sm">
@@ -539,7 +539,7 @@ export default function ManifestsPage() {
                     </td>
                   </tr>
                 )}
-                {pagedManifests.map((m) => {
+                {pagedManifests.map((m, i) => {
                   const isExtracting = m.status === 'extracting';
                   const isFailed = m.status === 'failed';
                   const isIgnored = m.status === 'ignored';
@@ -548,8 +548,13 @@ export default function ManifestsPage() {
                   const isRetrying = retrying && retryingManifestId === m.id;
 
                   return (
-                  <tr
+                  <motion.tr
                     key={m.id}
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    whileHover={isPending ? undefined : { y: -1, transition: { duration: 0.15, ease: 'easeOut' } }}
+                    whileFocus={isPending ? undefined : { y: -1, transition: { duration: 0.15, ease: 'easeOut' } }}
+                    transition={{ duration: 0.6, delay: i * 0.055, ease: [0.45, 0, 0.15, 1] as const }}
                     {...(isPending ? {} : {
                       onClick: () => router.push(`/dashboard/manifests/${m.id}`),
                       onKeyDown: (e: ReactKeyboardEvent<HTMLTableRowElement>) => {
@@ -562,10 +567,10 @@ export default function ManifestsPage() {
                       role: 'link',
                       'aria-label': `Open manifest ${m.reference_number}`,
                     })}
-                    className={`group relative border-b border-gray-200 dark:border-navy-700 outline-none transition-all duration-150 ${
+                    className={`group relative border-b border-gray-200 dark:border-navy-700 outline-none transition-colors duration-150 ${
                       isPending
                         ? ''
-                        : 'cursor-pointer hover:z-10 focus-visible:z-10 hover:-translate-y-px focus-visible:-translate-y-px hover:bg-emerald-50/40 dark:hover:bg-emerald-950/10 hover:shadow-[0_4px_16px_-4px_rgba(16,185,129,0.3)] dark:hover:shadow-[0_4px_16px_-4px_rgba(16,185,129,0.2)] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-emerald-400'
+                        : 'cursor-pointer hover:z-10 focus-visible:z-10 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/10 hover:shadow-[0_4px_16px_-4px_rgba(16,185,129,0.3)] dark:hover:shadow-[0_4px_16px_-4px_rgba(16,185,129,0.2)] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-emerald-400'
                     }`}
                   >
                     <td className="px-4 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap group-hover:rounded-l-lg">
@@ -645,7 +650,7 @@ export default function ManifestsPage() {
                         )}
                       </span>
                     </td>
-                  </tr>
+                  </motion.tr>
                   );
                 })}
               </tbody>
