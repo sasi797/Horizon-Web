@@ -21,21 +21,27 @@ const STATUS_BADGE: Record<string, string> = {
   on_hold: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
   exported: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300',
   cancelled: 'bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400',
+  ignored: 'bg-gray-100 dark:bg-navy-800 text-gray-500 dark:text-navy-400',
 };
 
 // The manifest's own Status column only makes sense once extraction has produced
 // jobs — while extracting or failed, this column shows '—' and the separate
-// Extract column (loading / completed / failed) carries the meaningful state.
-const EXTRACT_BADGE: Record<'loading' | 'completed' | 'failed', string> = {
+// Extract column (loading / completed / failed / ignored) carries the meaningful
+// state. "ignored" is a same-filename resend that was skipped before extraction
+// ever ran — distinct from "failed" (an extraction attempt that broke) since
+// it's never retryable.
+const EXTRACT_BADGE: Record<'loading' | 'completed' | 'failed' | 'ignored', string> = {
   loading: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400',
   completed: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400',
   failed: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+  ignored: 'bg-gray-100 dark:bg-navy-800 text-gray-500 dark:text-navy-400',
 };
 
-const EXTRACT_LABEL: Record<'loading' | 'completed' | 'failed', string> = {
+const EXTRACT_LABEL: Record<'loading' | 'completed' | 'failed' | 'ignored', string> = {
   loading: 'Extracting…',
   completed: 'Completed',
   failed: 'Failed',
+  ignored: 'Skipped (duplicate)',
 };
 
 const TAG_COLORS = [
@@ -61,6 +67,7 @@ const STATUS_LABEL: Record<string, string> = {
   on_hold: 'On Hold',
   exported: 'Exported',
   cancelled: 'Cancelled',
+  ignored: 'Ignored',
 };
 
 const TABLE_COLUMNS = [
@@ -389,7 +396,9 @@ export default function ManifestsPage() {
                 {filteredManifests.map((m) => {
                   const isExtracting = m.status === 'extracting';
                   const isFailed = m.status === 'failed';
+                  const isIgnored = m.status === 'ignored';
                   const isPending = isExtracting || isFailed;
+                  const extractState = isExtracting ? 'loading' : isFailed ? 'failed' : isIgnored ? 'ignored' : 'completed';
                   const isRetrying = retrying && retryingManifestId === m.id;
 
                   return (
@@ -436,11 +445,11 @@ export default function ManifestsPage() {
                       )}
                     </td>
                     <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${EXTRACT_BADGE[isExtracting ? 'loading' : isFailed ? 'failed' : 'completed']}`}>
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${EXTRACT_BADGE[extractState]}`}>
                         {isExtracting && <RefreshCw size={9} className="animate-spin" />}
-                        {isFailed && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />}
-                        {!isPending && <CheckCircle2 size={9} />}
-                        {EXTRACT_LABEL[isExtracting ? 'loading' : isFailed ? 'failed' : 'completed']}
+                        {(isFailed || isIgnored) && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />}
+                        {extractState === 'completed' && <CheckCircle2 size={9} />}
+                        {EXTRACT_LABEL[extractState]}
                       </span>
                       {isFailed && (
                         <button

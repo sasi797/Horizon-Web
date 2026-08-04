@@ -10,6 +10,21 @@ export function cityLine(value: string | null): string {
   return lines[lines.length - 1] ?? '—';
 }
 
+// Same-location identity for grouping HAWBs onto one driver leg — deliberately
+// coarser than an exact string match. Two HAWBs for the same company are often
+// OCR'd from different source documents, so the middle address lines (floor,
+// suite, minor whitespace/punctuation) can drift even when the company name and
+// city/country line — the two things a driver actually reads off the "From"/"To"
+// columns — are identical. Keys on just those two, normalized.
+export function addressIdentityKey(value: string | null): string | null {
+  if (!value) return null;
+  const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').replace(/[.,]+$/, '').trim();
+  const name = normalize(splitAddress(value).name);
+  const last = normalize(cityLine(value));
+  if (!name || name === '—') return null;
+  return `${name}|${last}`;
+}
+
 const UK_POSTCODE_RE = /[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
 const EIRCODE_RE = /[A-Z]\d{2}\s?[A-Z0-9]{4}\b/i;
 const NUMERIC_POSTCODE_RE = /\b\d{4,6}\b/;

@@ -100,7 +100,7 @@ export interface HawbManifest {
   reference_number: string;
   job_count: number;
   total_weight_kg: number;
-  status: 'pending_review' | 'open' | 'booked' | 'confirmed' | 'on_hold' | 'exported' | 'cancelled' | 'extracting' | 'failed';
+  status: 'pending_review' | 'open' | 'booked' | 'confirmed' | 'on_hold' | 'exported' | 'cancelled' | 'extracting' | 'failed' | 'ignored';
   exported_at: string | null;
   indigo_job_number: string | null;
   cancelled_at: string | null;

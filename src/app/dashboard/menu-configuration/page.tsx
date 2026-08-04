@@ -15,6 +15,7 @@ import {
   type DropdownValue,
 } from '@/services/dropdownApi';
 import ApiErrorState from '@/components/ApiErrorState';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import RequireRole from '@/components/RequireRole';
 
 const BASE_MODULES = [
@@ -26,16 +27,18 @@ const inputClass = 'w-full h-8 px-2.5 bg-transparent border border-gray-200 dark
 
 function MenuConfigurationPageContent() {
   const { data: fields = [], isLoading, isError, refetch } = useGetDropdownFieldsQuery();
-  const [deleteField] = useDeleteDropdownFieldMutation();
+  const [deleteField, { isLoading: isDeletingField }] = useDeleteDropdownFieldMutation();
   const [createValue, { isLoading: isAdding }] = useCreateDropdownValueMutation();
   const [updateValue] = useUpdateDropdownValueMutation();
-  const [deleteValue] = useDeleteDropdownValueMutation();
+  const [deleteValue, { isLoading: isDeletingValue }] = useDeleteDropdownValueMutation();
 
   const [activeModule, setActiveModule] = useState(BASE_MODULES[0].key);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [newValue, setNewValue] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [pendingDeleteField, setPendingDeleteField] = useState<DropdownField | null>(null);
+  const [pendingDeleteValue, setPendingDeleteValue] = useState<DropdownValue | null>(null);
 
   const extraModules = [...new Set(fields.map(f => f.module))]
     .filter(m => !BASE_MODULES.some(bm => bm.key === m))
@@ -54,12 +57,13 @@ function MenuConfigurationPageContent() {
 
   const sortedValues = selectedField ? [...selectedField.values].sort((a, b) => a.order_index - b.order_index) : [];
 
-  const handleDeleteField = async (f: DropdownField) => {
-    if (!window.confirm(`Delete the "${f.field_label}" dropdown field and all of its values? This cannot be undone.`)) return;
+  const confirmDeleteField = async () => {
+    if (!pendingDeleteField) return;
     setError(null);
     try {
-      await deleteField(f.id).unwrap();
-      if (selectedFieldId === f.id) setSelectedFieldId(null);
+      await deleteField(pendingDeleteField.id).unwrap();
+      if (selectedFieldId === pendingDeleteField.id) setSelectedFieldId(null);
+      setPendingDeleteField(null);
     } catch (err) {
       const detail = (err as { data?: { detail?: string } })?.data?.detail;
       setError(detail ?? 'Failed to delete field.');
@@ -83,11 +87,12 @@ function MenuConfigurationPageContent() {
     }
   };
 
-  const handleDeleteValue = async (v: DropdownValue) => {
-    if (!window.confirm(`Remove "${v.label}"?`)) return;
+  const confirmDeleteValue = async () => {
+    if (!pendingDeleteValue) return;
     setError(null);
     try {
-      await deleteValue(v.id).unwrap();
+      await deleteValue(pendingDeleteValue.id).unwrap();
+      setPendingDeleteValue(null);
     } catch {
       setError('Failed to delete value.');
     }
@@ -141,6 +146,28 @@ function MenuConfigurationPageContent() {
       {error && (
         <p className="text-[12px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 rounded-lg px-3 py-2">{error}</p>
       )}
+
+      <ConfirmDialog
+        open={pendingDeleteField != null}
+        title="Delete field?"
+        message={`Delete the "${pendingDeleteField?.field_label}" dropdown field and all of its values? This cannot be undone.`}
+        confirmLabel="Delete field"
+        tone="danger"
+        loading={isDeletingField}
+        onConfirm={confirmDeleteField}
+        onClose={() => setPendingDeleteField(null)}
+      />
+
+      <ConfirmDialog
+        open={pendingDeleteValue != null}
+        title="Remove value?"
+        message={`"${pendingDeleteValue?.label}" will be removed from this list.`}
+        confirmLabel="Remove"
+        tone="danger"
+        loading={isDeletingValue}
+        onConfirm={confirmDeleteValue}
+        onClose={() => setPendingDeleteValue(null)}
+      />
 
       <motion.div variants={staggerItem} className="flex items-center gap-1 border-b border-gray-200 dark:border-navy-700">
         {modules.map(({ key, label, icon: Icon }) => (
@@ -229,7 +256,7 @@ function MenuConfigurationPageContent() {
                       </div>
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); handleDeleteField(f); }}
+                        onClick={(e) => { e.stopPropagation(); setPendingDeleteField(f); }}
                         className="relative z-10 shrink-0 opacity-0 group-hover:opacity-100 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-opacity"
                         aria-label={`Delete ${f.field_label}`}
                       >
@@ -323,7 +350,7 @@ function MenuConfigurationPageContent() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDeleteValue(v)}
+                            onClick={() => setPendingDeleteValue(v)}
                             className="shrink-0 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
                             aria-label={`Delete ${v.label}`}
                           >

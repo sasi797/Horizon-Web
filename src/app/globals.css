@@ -80,3 +80,14 @@ a {
 .dark * {
   scrollbar-color: hsl(218, 55%, 32%) transparent;
 }
+
+/* Mandatory-field indicator — a slow pulsing glow so a required-but-empty
+   or placeholder ("Blinded Data") value reads as "needs attention" rather
+   than just a static red outline that's easy to miss while scanning a form. */
+@keyframes field-invalid-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.35); }
+  50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12); }
+}
+.field-invalid {
+  animation: field-invalid-pulse 1.8s ease-in-out infinite;
+}

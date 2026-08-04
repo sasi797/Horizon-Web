@@ -22,7 +22,7 @@ import {
 import ApiErrorState from '@/components/ApiErrorState';
 import Tooltip from '@/components/Tooltip';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import { splitAddress, cityLine, cityAndPostcodeLine, parseAddressParts, buildAddress, type AddressParts } from '@/lib/hawbFormat';
+import { splitAddress, cityLine, cityAndPostcodeLine, parseAddressParts, buildAddress, addressIdentityKey, type AddressParts } from '@/lib/hawbFormat';
 import { useGetDropdownValuesQuery } from '@/services/dropdownApi';
 
 const MANIFEST_STATUS_BADGE: Record<string, string> = {
@@ -35,6 +35,7 @@ const MANIFEST_STATUS_BADGE: Record<string, string> = {
   cancelled: 'bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400',
   extracting: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400',
   failed: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+  ignored: 'bg-gray-100 dark:bg-navy-800 text-gray-500 dark:text-navy-400',
 };
 
 const MANIFEST_STATUS_LABEL: Record<string, string> = {
@@ -47,6 +48,7 @@ const MANIFEST_STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelled',
   extracting: 'Extracting…',
   failed: 'Extraction Failed',
+  ignored: 'Ignored (duplicate)',
 };
 
 // Manifest-level fields Indigo's AddJob needs that we don't have a home for
@@ -183,6 +185,7 @@ function ManifestDetailSkeleton() {
 function ManifestPlaceholderState({ manifest, onBack }: { manifest: HawbManifestDetail; onBack: () => void }) {
   const [retryExtraction, { isLoading: retrying }] = useRetryManifestExtractionMutation();
   const isFailed = manifest.status === 'failed';
+  const isIgnored = manifest.status === 'ignored';
 
   return (
     <div className="flex flex-col items-center gap-3 bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 py-16 px-6 text-center">
@@ -196,11 +199,15 @@ function ManifestPlaceholderState({ manifest, onBack }: { manifest: HawbManifest
         Back to manifests
       </button>
       <span className={`inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2.5 py-0.5 rounded-full ${MANIFEST_STATUS_BADGE[manifest.status]}`}>
-        {isFailed ? <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" /> : <RefreshCw size={9} className="animate-spin" />}
+        {isFailed || isIgnored ? <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" /> : <RefreshCw size={9} className="animate-spin" />}
         {MANIFEST_STATUS_LABEL[manifest.status]}
       </span>
       <h1 className="text-[13px] font-bold text-gray-700 dark:text-navy-200">{manifest.document.filename}</h1>
-      {isFailed ? (
+      {isIgnored ? (
+        <p className="text-[12px] text-gray-500 dark:text-navy-500 max-w-sm">
+          {manifest.remarks ?? 'This filename was already ingested previously, so it was not re-extracted.'} This is a resend, not a failure, so there&apos;s no retry — if this file genuinely has new content, it needs to arrive under a different filename.
+        </p>
+      ) : isFailed ? (
         <>
           <p className="text-[12px] text-gray-500 dark:text-navy-500 max-w-sm">
             {manifest.remarks ?? 'Extraction failed for this document, so there is nothing to manifest yet.'} Retry to re-process the PDF already on file — no need to resend the email.
@@ -271,6 +278,14 @@ function Section({
   );
 }
 
+// The literal placeholder text an OCR extractor drops in for a redacted
+// blinded-trial shipper/consignee block — not a usable value for a driver
+// run sheet. Blank fields are allowed through (e.g. addresses that
+// legitimately have no separate town/postcode line).
+function isBlinded(value: string): boolean {
+  return value.trim().toLowerCase().includes('blinded data');
+}
+
 function AddressFields({
   value, locked, onChange, onSave,
 }: {
@@ -295,42 +310,44 @@ function AddressFields({
         <input disabled={locked} value={parts.name}
           onChange={e => update({ name: e.target.value })}
           onBlur={commit}
-          className={inputClass(locked)} />
+          className={inputClass(locked, isBlinded(parts.name))} />
       </Field>
       <Field label="Address">
         <textarea disabled={locked} value={parts.address} rows={2}
           onChange={e => update({ address: e.target.value })}
           onBlur={commit}
-          className={inputClass(locked)} />
+          className={inputClass(locked, isBlinded(parts.address))} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Town">
           <input disabled={locked} value={parts.town}
             onChange={e => update({ town: e.target.value })}
             onBlur={commit}
-            className={inputClass(locked)} />
+            className={inputClass(locked, isBlinded(parts.town))} />
         </Field>
         <Field label="Postcode">
           <input disabled={locked} value={parts.postcode}
             onChange={e => update({ postcode: e.target.value })}
             onBlur={commit}
-            className={inputClass(locked)} />
+            className={inputClass(locked, isBlinded(parts.postcode))} />
         </Field>
       </div>
       <Field label="Country">
         <input disabled={locked} value={parts.country}
           onChange={e => update({ country: e.target.value })}
           onBlur={commit}
-          className={inputClass(locked)} />
+          className={inputClass(locked, isBlinded(parts.country))} />
       </Field>
     </div>
   );
 }
 
-function inputClass(locked: boolean) {
-  return `w-full text-[13px] border border-gray-200 dark:border-navy-700 rounded-xl px-3 py-1.5 bg-gray-50/60 dark:bg-navy-800/60 text-black dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-300 dark:focus:border-emerald-600 focus:bg-white dark:focus:bg-navy-800 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-900/40 transition-all ${
-    locked ? 'opacity-60 cursor-not-allowed' : ''
-  }`;
+function inputClass(locked: boolean, invalid?: boolean) {
+  const base = 'w-full text-[13px] border rounded-xl px-3 py-1.5 bg-gray-50/60 dark:bg-navy-800/60 text-black dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:bg-white dark:focus:bg-navy-800 focus:ring-2 transition-all';
+  const state = invalid && !locked
+    ? 'field-invalid border-red-400 dark:border-red-500 focus:border-red-400 dark:focus:border-red-500 focus:ring-red-100 dark:focus:ring-red-900/40'
+    : 'border-gray-200 dark:border-navy-700 focus:border-emerald-300 dark:focus:border-emerald-600 focus:ring-emerald-100 dark:focus:ring-emerald-900/40';
+  return `${base} ${state} ${locked ? 'opacity-60 cursor-not-allowed' : ''}`;
 }
 
 const TAG_CLASSES: Record<'gray' | 'blue' | 'purple', string> = {
@@ -600,20 +617,54 @@ export default function ManifestDetailPage() {
     }
   }, [selectedJob, syncedFormFor]);
 
-  // Groups jobs that share the exact same collection and delivery address — a
-  // driver visiting the same two stops for multiple HAWBs can treat them as one
-  // combined leg. This is purely a display grouping for the "Merge" run-order
-  // view; it never changes the underlying jobs or their order. Computed here
+  // Groups jobs into shared driver legs for the "Merge" run-order view. Two-tier
+  // priority: (1) same delivery ("To") address — that's the repeated stop the
+  // driver actually cares about; (2) for whatever's left ungrouped after that,
+  // same shipper contact (the named collection contact, not just the same
+  // building — e.g. two HAWBs booked by the same person at a hospital even
+  // though the printed address block has minor differences per document).
+  // This is purely a display grouping; it never changes the underlying jobs or
+  // their order. Computed here
   // (before the loading/error early returns below) because the useEffect that
   // depends on it must itself be called unconditionally on every render — a
   // hook placed after an early return gets skipped on some renders and not
   // others, which is exactly what triggered "Rendered more hooks than during
   // the previous render" when this lived further down.
   const routeGroups = new Map<string, HawbJob[]>();
+  const jobGroupKey = new Map<string, string>();
+  const groupedJobIds = new Set<string>();
+
+  const byConsignee = new Map<string, HawbJob[]>();
   for (const job of orderedJobs) {
-    const key = `${job.shipper}→${job.consignee}`;
-    const group = routeGroups.get(key);
-    if (group) group.push(job); else routeGroups.set(key, [job]);
+    const identity = addressIdentityKey(job.consignee);
+    if (!identity) continue;
+    const group = byConsignee.get(identity);
+    if (group) group.push(job); else byConsignee.set(identity, [job]);
+  }
+  for (const [identity, jobs] of byConsignee) {
+    if (jobs.length < 2) continue;
+    const key = `to:${identity}`;
+    routeGroups.set(key, jobs);
+    jobs.forEach(j => { jobGroupKey.set(j.id, key); groupedJobIds.add(j.id); });
+  }
+
+  const byShipperContact = new Map<string, HawbJob[]>();
+  for (const job of orderedJobs) {
+    if (groupedJobIds.has(job.id)) continue;
+    const contact = job.shipper_contact?.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!contact) continue;
+    const group = byShipperContact.get(contact);
+    if (group) group.push(job); else byShipperContact.set(contact, [job]);
+  }
+  for (const [contact, jobs] of byShipperContact) {
+    if (jobs.length < 2) continue;
+    const key = `contact:${contact}`;
+    routeGroups.set(key, jobs);
+    jobs.forEach(j => { jobGroupKey.set(j.id, key); groupedJobIds.add(j.id); });
+  }
+
+  for (const job of orderedJobs) {
+    if (!jobGroupKey.has(job.id)) jobGroupKey.set(job.id, `single:${job.id}`);
   }
 
   if (isLoading) {
@@ -622,7 +673,7 @@ export default function ManifestDetailPage() {
   if (isError || !manifest) {
     return <ApiErrorState title="Failed to load manifest" onRetry={refetch} />;
   }
-  if (manifest.status === 'extracting' || manifest.status === 'failed') {
+  if (manifest.status === 'extracting' || manifest.status === 'failed' || manifest.status === 'ignored') {
     return <ManifestPlaceholderState manifest={manifest} onBack={() => router.push('/dashboard/manifests')} />;
   }
 
@@ -634,6 +685,20 @@ export default function ManifestDetailPage() {
   const packageCount = orderedJobs.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
   const jobIdsWithUpdates = new Set(jobUpdates.map(u => u.job_id));
   const jobsMissingService = orderedJobs.filter(j => !j.job_service_type).length;
+  // A parsed shipper/consignee field only blocks export if it still holds the
+  // literal "Blinded Data" placeholder an extractor drops in for a redacted
+  // blinded-trial address. Blank fields are allowed through — e.g. addresses
+  // that legitimately have no separate town/postcode line (some Irish
+  // addresses) are not treated as incomplete.
+  const jobHasIncompleteAddress = (job: HawbJob) => {
+    const shipper = parseAddressParts(job.shipper);
+    const consignee = parseAddressParts(job.consignee);
+    return isBlinded(shipper.name) || isBlinded(shipper.address)
+      || isBlinded(shipper.town) || isBlinded(shipper.postcode) || isBlinded(shipper.country)
+      || isBlinded(consignee.name) || isBlinded(consignee.address)
+      || isBlinded(consignee.town) || isBlinded(consignee.postcode) || isBlinded(consignee.country);
+  };
+  const jobsWithIncompleteAddress = orderedJobs.filter(jobHasIncompleteAddress).length;
   const missingExportFields = [
     !manifestFields.start_point && 'Start point',
     !manifestFields.end_point && 'End point',
@@ -642,6 +707,7 @@ export default function ManifestDetailPage() {
     !manifestFields.vehicle_size && 'Vehicle size',
     !indigoFields.service_type && 'Service type',
     jobsMissingService > 0 && `Del/Coll on ${jobsMissingService} job${jobsMissingService === 1 ? '' : 's'}`,
+    jobsWithIncompleteAddress > 0 && `Shipper/Consignee details on ${jobsWithIncompleteAddress} job${jobsWithIncompleteAddress === 1 ? '' : 's'}`,
   ].filter((v): v is string => Boolean(v));
 
   // Start/end point pickers offer the Configuration defaults (module 'manifest',
@@ -713,6 +779,13 @@ export default function ManifestDetailPage() {
 
   const saveJobField = async (jobId: string, field: string, value: unknown) => {
     if (locked) return;
+    // updateHawbJob only invalidates the 'HawbJob' cache tag, not the manifest
+    // detail query this page reads (it's keyed on 'HawbManifest') — so without
+    // this, orderedJobs (and everything derived from it: export-readiness
+    // checks, the run-order table) would stay stale until an unrelated
+    // manifest-level refetch happened to occur. Apply the edit to local state
+    // immediately, same workaround updateServiceType already uses below.
+    setOrderedJobs(prev => prev.map(j => (j.id === jobId ? { ...j, [field]: value } : j)));
     try {
       await updateJob({ id: jobId, body: { [field]: value } }).unwrap();
     } catch {
@@ -1082,7 +1155,7 @@ export default function ManifestDetailPage() {
             const jobMultiPackage = job.packages.length > 1;
             const jobPackagesHaveDetail = job.packages.some(p => p.temperature_range || p.dimensions);
             const jobShowCombinedTempDims = !jobMultiPackage || !jobPackagesHaveDetail;
-            const groupKey = `${job.shipper}→${job.consignee}`;
+            const groupKey = jobGroupKey.get(job.id) ?? `single:${job.id}`;
             const routeGroup = routeGroups.get(groupKey) ?? [job];
             const isGroupParent = runOrderView === 'merge' && routeGroup.length > 1;
             const isFirstInGroup = isGroupParent && routeGroup[0].id === job.id;
@@ -1100,6 +1173,7 @@ export default function ManifestDetailPage() {
             const rowNumber = mergeRowCounter;
 
             if (isGroupParent && !groupExpanded) {
+              const matchedOn = groupKey.startsWith('to:') ? 'Same To' : 'Same Shipper Contact';
               const collTimes = routeGroup.map(j => j.collection_at ? formatTime(j.collection_at) : '—');
               const delTimes = routeGroup.map(j => j.delivery_at ? formatTime(j.delivery_at) : '—');
               const services = routeGroup.map(j => j.job_service_type ?? '');
@@ -1118,6 +1192,7 @@ export default function ManifestDetailPage() {
                           <ChevronDown size={11} className="text-blue-400 dark:text-blue-500 shrink-0 -rotate-90" />
                           <Combine size={11} className="text-blue-500 dark:text-blue-400 shrink-0" />
                           <span className="text-[10px] font-bold text-blue-500 dark:text-blue-400 shrink-0">{routeGroup.length} HAWBs</span>
+                          <span className="text-[9px] font-semibold text-blue-400/80 dark:text-blue-500/80 shrink-0 px-1 py-px rounded bg-blue-100/70 dark:bg-blue-900/40">{matchedOn}</span>
                         </div>
                         <div className="max-h-12 overflow-y-auto pr-1 mt-0.5 space-y-0.5">
                           {routeGroup.map(j => (
@@ -1190,7 +1265,7 @@ export default function ManifestDetailPage() {
                   >
                     <span className="font-mono">{rowNumber}</span>
                     <Combine size={11} strokeWidth={2.25} className="shrink-0" />
-                    {routeGroup.length} HAWBs share this route — click to collapse
+                    {routeGroup.length} HAWBs share this route ({groupKey.startsWith('to:') ? 'same To' : 'same shipper contact'}) — click to collapse
                   </div>
                 )}
                 <div
