@@ -25,6 +25,22 @@ const BASE_MODULES = [
 
 const inputClass = 'w-full h-8 px-2.5 bg-transparent border border-gray-200 dark:border-navy-700 rounded-lg text-[12.5px] text-gray-800 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-500/60 transition-colors';
 
+// The Indigo export payload builder (Horizon-Api's indigo_export.py) parses
+// start_point/end_point the same way it parses a HAWB shipper/consignee
+// address: first line = name, middle line = street address, second-to-last
+// line = "Town, Postcode", last line = Country. Rather than have someone type
+// that multi-line format by hand (easy to get wrong), these two fields get
+// discrete inputs that get composed into the same underlying string.
+const ADDRESS_FIELD_NAMES = new Set(['start_point', 'end_point']);
+const EMPTY_ADDRESS_FORM = { name: '', address: '', town: '', postcode: '', country: '' };
+
+function composeAddressValue(form: typeof EMPTY_ADDRESS_FORM): string {
+  const cityLine = [form.town.trim(), form.postcode.trim()].filter(Boolean).join(', ');
+  return [form.name.trim(), form.address.trim(), cityLine, form.country.trim()]
+    .filter(Boolean)
+    .join('\n');
+}
+
 function MenuConfigurationPageContent() {
   const { data: fields = [], isLoading, isError, refetch } = useGetDropdownFieldsQuery();
   const [deleteField, { isLoading: isDeletingField }] = useDeleteDropdownFieldMutation();
@@ -36,6 +52,7 @@ function MenuConfigurationPageContent() {
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [newValue, setNewValue] = useState('');
   const [newLabel, setNewLabel] = useState('');
+  const [addressForm, setAddressForm] = useState(EMPTY_ADDRESS_FORM);
   const [error, setError] = useState<string | null>(null);
   const [pendingDeleteField, setPendingDeleteField] = useState<DropdownField | null>(null);
   const [pendingDeleteValue, setPendingDeleteValue] = useState<DropdownValue | null>(null);
@@ -56,6 +73,7 @@ function MenuConfigurationPageContent() {
   }, [activeModule, fields]);
 
   const sortedValues = selectedField ? [...selectedField.values].sort((a, b) => a.order_index - b.order_index) : [];
+  const isAddressField = selectedField ? ADDRESS_FIELD_NAMES.has(selectedField.field_name) : false;
 
   const confirmDeleteField = async () => {
     if (!pendingDeleteField) return;
@@ -72,15 +90,17 @@ function MenuConfigurationPageContent() {
 
   const handleAddValue = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedField || !newValue.trim() || !newLabel.trim()) return;
+    const value = isAddressField ? composeAddressValue(addressForm) : newValue.trim();
+    if (!selectedField || !value || !newLabel.trim()) return;
     setError(null);
     try {
       await createValue({
         fieldId: selectedField.id,
-        body: { value: newValue.trim(), label: newLabel.trim(), order_index: sortedValues.length },
+        body: { value, label: newLabel.trim(), order_index: sortedValues.length },
       }).unwrap();
       setNewValue('');
       setNewLabel('');
+      setAddressForm(EMPTY_ADDRESS_FORM);
     } catch (err) {
       const detail = (err as { data?: { detail?: string } })?.data?.detail;
       setError(detail ?? 'Failed to add value.');
@@ -334,7 +354,9 @@ function MenuConfigurationPageContent() {
                             </button>
                           </div>
                           <div className="flex-1 min-w-0 grid grid-cols-2 gap-3">
-                            <span className="font-mono text-[11.5px] text-gray-500 dark:text-navy-400 truncate">{v.value}</span>
+                            <span className="font-mono text-[11.5px] text-gray-500 dark:text-navy-400 truncate">
+                              {isAddressField ? v.value.split('\n').join(' · ') : v.value}
+                            </span>
                             <span className="text-[12.5px] font-semibold text-gray-900 dark:text-gray-100 truncate">{v.label}</span>
                           </div>
                           <button
@@ -361,29 +383,90 @@ function MenuConfigurationPageContent() {
                     </div>
                   )}
 
-                  <form onSubmit={handleAddValue} className="flex items-center gap-2 px-4 py-3 border-t border-gray-100 dark:border-navy-800">
-                    <input
-                      type="text"
-                      value={newValue}
-                      onChange={(e) => setNewValue(e.target.value)}
-                      placeholder="Value (e.g. Sameday)"
-                      className={inputClass}
-                    />
-                    <input
-                      type="text"
-                      value={newLabel}
-                      onChange={(e) => setNewLabel(e.target.value)}
-                      placeholder="Label (e.g. Sameday)"
-                      className={inputClass}
-                    />
-                    <button
-                      type="submit"
-                      disabled={!newValue.trim() || !newLabel.trim() || isAdding}
-                      className="shrink-0 h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[12px] font-semibold transition-colors inline-flex items-center gap-1"
-                    >
-                      <Plus size={12} strokeWidth={2.5} /> Add
-                    </button>
-                  </form>
+                  {isAddressField ? (
+                    <form onSubmit={handleAddValue} className="flex flex-col gap-2 px-4 py-3 border-t border-gray-100 dark:border-navy-800">
+                      <p className="text-[10.5px] text-gray-400 dark:text-navy-500">
+                        Name, street address, town, postcode and country are combined into the format Indigo export expects.
+                      </p>
+                      <input
+                        type="text"
+                        value={addressForm.name}
+                        onChange={(e) => setAddressForm(f => ({ ...f, name: e.target.value }))}
+                        placeholder="Name / Company (e.g. Marken)"
+                        className={inputClass}
+                      />
+                      <input
+                        type="text"
+                        value={addressForm.address}
+                        onChange={(e) => setAddressForm(f => ({ ...f, address: e.target.value }))}
+                        placeholder="Street address (e.g. 648 River Gardens)"
+                        className={inputClass}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={addressForm.town}
+                          onChange={(e) => setAddressForm(f => ({ ...f, town: e.target.value }))}
+                          placeholder="Town (e.g. Feltham)"
+                          className={inputClass}
+                        />
+                        <input
+                          type="text"
+                          value={addressForm.postcode}
+                          onChange={(e) => setAddressForm(f => ({ ...f, postcode: e.target.value }))}
+                          placeholder="Postcode (e.g. TW13 7NX)"
+                          className={inputClass}
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={addressForm.country}
+                        onChange={(e) => setAddressForm(f => ({ ...f, country: e.target.value }))}
+                        placeholder="Country (e.g. United Kingdom)"
+                        className={inputClass}
+                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={newLabel}
+                          onChange={(e) => setNewLabel(e.target.value)}
+                          placeholder="Label (e.g. Marken Feltham)"
+                          className={inputClass}
+                        />
+                        <button
+                          type="submit"
+                          disabled={!addressForm.name.trim() || !newLabel.trim() || isAdding}
+                          className="shrink-0 h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[12px] font-semibold transition-colors inline-flex items-center gap-1"
+                        >
+                          <Plus size={12} strokeWidth={2.5} /> Add
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleAddValue} className="flex items-center gap-2 px-4 py-3 border-t border-gray-100 dark:border-navy-800">
+                      <input
+                        type="text"
+                        value={newValue}
+                        onChange={(e) => setNewValue(e.target.value)}
+                        placeholder="Value (e.g. Sameday)"
+                        className={inputClass}
+                      />
+                      <input
+                        type="text"
+                        value={newLabel}
+                        onChange={(e) => setNewLabel(e.target.value)}
+                        placeholder="Label (e.g. Sameday)"
+                        className={inputClass}
+                      />
+                      <button
+                        type="submit"
+                        disabled={!newValue.trim() || !newLabel.trim() || isAdding}
+                        className="shrink-0 h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[12px] font-semibold transition-colors inline-flex items-center gap-1"
+                      >
+                        <Plus size={12} strokeWidth={2.5} /> Add
+                      </button>
+                    </form>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
