@@ -11,7 +11,6 @@ import {
   Users,
   ShieldCheck,
   ListTree,
-  UserPlus,
   LayoutDashboard,
   Sun,
   Moon,
@@ -31,7 +30,8 @@ const adminItems = [
   { icon: Users, label: 'Users', color: 'bg-blue-500 text-white', href: '/dashboard/users' },
   { icon: ShieldCheck, label: 'Roles', color: 'bg-purple-500 text-white', href: '/dashboard/roles' },
   { icon: ListTree, label: 'Configuration', color: 'bg-amber-500 text-white', href: '/dashboard/menu-configuration' },
-  { icon: UserPlus, label: 'Nexus', color: 'bg-indigo-500 text-white', href: '/dashboard/nexus' },
+  // Nexus is hidden from the menu — the page itself is untouched and still
+  // reachable by typing /dashboard/nexus.
 ];
 
 const systemItems = [
