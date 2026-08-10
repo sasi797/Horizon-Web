@@ -54,6 +54,29 @@ export function postcodeLine(value: string | null): string {
   return cityAndPostcodeLine(value).postcode;
 }
 
+// Extractors write the country line in whichever form the source document used,
+// and constituent nations turn up as often as the union's own name.
+const UK_COUNTRY_NAMES = new Set([
+  'uk', 'gb', 'united kingdom', 'great britain', 'england', 'scotland', 'wales',
+  'northern ireland', 'united kingdom of great britain and northern ireland',
+]);
+
+// Whether an address blob sits in the UK, read off its country line. Anything
+// unrecognized (including a blinded placeholder) counts as not-UK — callers use
+// this to pick a default, so an uncertain answer should decline rather than
+// guess.
+export function isUkAddress(value: string | null): boolean {
+  if (!value) return false;
+  const last = cityLine(value);
+  if (last === '—') return false;
+  const country = last.toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (UK_COUNTRY_NAMES.has(country)) return true;
+  // No country line at all — the blob ends on its "Town, Postcode" line. A
+  // UK-format postcode is then the only signal, and none of the other countries
+  // these manifests reach use that format.
+  return UK_POSTCODE_RE.test(last);
+}
+
 export type AddressParts = { name: string; address: string; town: string; postcode: string; country: string };
 
 const EMPTY_ADDRESS_PARTS: AddressParts = { name: '', address: '', town: '', postcode: '', country: '' };

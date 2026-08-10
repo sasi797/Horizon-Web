@@ -22,7 +22,7 @@ import {
 import ApiErrorState from '@/components/ApiErrorState';
 import Tooltip from '@/components/Tooltip';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import { splitAddress, cityLine, cityAndPostcodeLine, parseAddressParts, buildAddress, addressIdentityKey, type AddressParts } from '@/lib/hawbFormat';
+import { splitAddress, cityLine, cityAndPostcodeLine, parseAddressParts, buildAddress, addressIdentityKey, isUkAddress, type AddressParts } from '@/lib/hawbFormat';
 import { useGetDropdownValuesQuery } from '@/services/dropdownApi';
 
 const MANIFEST_STATUS_BADGE: Record<string, string> = {
@@ -454,6 +454,17 @@ const SERVICE_TYPE_OPTIONS: { value: JobServiceType; label: string; short: strin
   { value: 'collection', label: 'Collection', short: 'Coll' },
 ];
 
+// Del/Coll follows the route's UK leg — these are UK driver runs, so a UK
+// "From" means the driver collects and a UK "To" means the driver delivers.
+// Domestic UK-to-UK could be either (and neither end in the UK is not this
+// driver's job at all), so both those cases stay unset for a person to pick.
+function defaultServiceType(job: HawbJob): JobServiceType | null {
+  const fromUk = isUkAddress(job.shipper);
+  const toUk = isUkAddress(job.consignee);
+  if (fromUk === toUk) return null;
+  return fromUk ? 'collection' : 'delivery';
+}
+
 function ServiceTypePicker({
   value, disabled, onChange,
 }: {
@@ -592,6 +603,30 @@ export default function ManifestDetailPage() {
     }
   }, [manifest, syncedJobs]);
 
+  // Fill in Del/Coll for any job the extractor left blank, from the route's UK
+  // leg (see defaultServiceType). Only ever fills a blank — an extracted or
+  // hand-picked value is never overwritten — and it persists rather than just
+  // displaying, since a blank Del/Coll is one of the things that blocks export.
+  // Exported manifests are left alone entirely.
+  const serviceDefaultedRef = useRef<Set<string>>(new Set());
+  const manifestLocked = manifest != null
+    && ((manifest.status !== 'open' && manifest.status !== 'pending_review') || manifest.exported_at != null);
+  const pendingServiceDefaults = (manifest?.jobs ?? [])
+    .filter(j => !j.job_service_type)
+    .map(j => `${j.id}=${defaultServiceType(j) ?? ''}`)
+    .filter(entry => !entry.endsWith('='))
+    .join(',');
+  useEffect(() => {
+    if (manifestLocked || !pendingServiceDefaults) return;
+    for (const entry of pendingServiceDefaults.split(',')) {
+      const [jobId, value] = entry.split('=') as [string, JobServiceType];
+      if (serviceDefaultedRef.current.has(jobId)) continue;
+      serviceDefaultedRef.current.add(jobId);
+      setOrderedJobs(prev => prev.map(j => (j.id === jobId ? { ...j, job_service_type: value } : j)));
+      updateJob({ id: jobId, body: { job_service_type: value } });
+    }
+  }, [pendingServiceDefaults, manifestLocked, updateJob]);
+
   useEffect(() => {
     if (manifest && syncedPointsFor !== manifest.id) {
       setSyncedPointsFor(manifest.id);
@@ -667,6 +702,19 @@ export default function ManifestDetailPage() {
     if (!jobGroupKey.has(job.id)) jobGroupKey.set(job.id, `single:${job.id}`);
   }
 
+  // The Merge view's run order is a list of stops, not of HAWBs: a merged group
+  // is one stop and every ungrouped HAWB is a stop of its own. Reordering (which
+  // only the Merge view offers) moves whole stops, so it works on these slots
+  // rather than on orderedJobs directly.
+  const mergeSlots: { key: string; jobs: HawbJob[] }[] = [];
+  const seenSlotKeys = new Set<string>();
+  for (const job of orderedJobs) {
+    const key = jobGroupKey.get(job.id)!;
+    if (seenSlotKeys.has(key)) continue;
+    seenSlotKeys.add(key);
+    mergeSlots.push({ key, jobs: routeGroups.get(key) ?? [job] });
+  }
+
   if (isLoading) {
     return <ManifestDetailSkeleton />;
   }
@@ -680,7 +728,7 @@ export default function ManifestDetailPage() {
   // Export no longer flips manifest.status (it stays 'open') — exported_at is now
   // the only signal that a manifest's jobs are locked and it can no longer be
   // edited, exported again, or cancelled.
-  const locked = (manifest.status !== 'open' && manifest.status !== 'pending_review') || manifest.exported_at != null;
+  const locked = manifestLocked;
   const dgCount = orderedJobs.filter(j => j.dangerous_goods).length;
   const packageCount = orderedJobs.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
   const jobIdsWithUpdates = new Set(jobUpdates.map(u => u.job_id));
@@ -754,15 +802,16 @@ export default function ManifestDetailPage() {
     persistOrder(orderedJobs);
   };
 
-  const handleDragOver = (index: number) => {
-    if (dragIndex === null || dragIndex === index) return;
-    setOrderedJobs(prev => {
-      const next = [...prev];
-      const [moved] = next.splice(dragIndex, 1);
-      next.splice(index, 0, moved);
-      return next;
-    });
-    setDragIndex(index);
+  // Dragging moves a whole stop (see mergeSlots). Writing the slots back out
+  // flattens each group's HAWBs contiguously at its new position, which is what
+  // the driver runs anyway — merged HAWBs are collected/delivered together.
+  const handleSlotDragOver = (slotIndex: number) => {
+    if (dragIndex === null || dragIndex === slotIndex) return;
+    const next = [...mergeSlots];
+    const [moved] = next.splice(dragIndex, 1);
+    next.splice(slotIndex, 0, moved);
+    setOrderedJobs(next.flatMap(slot => slot.jobs));
+    setDragIndex(slotIndex);
   };
 
   const saveManifestField = async (
@@ -1094,7 +1143,11 @@ export default function ManifestDetailPage() {
           <div>
             <h2 className="text-[12px] font-bold text-gray-700 dark:text-navy-200">Run order</h2>
             <p className="text-[10.5px] text-gray-500 dark:text-navy-500">
-              {locked ? 'Manifest is exported and locked' : 'Drag to reorder — click a row to expand its details'}
+              {locked
+                ? 'Manifest is exported and locked'
+                : runOrderView === 'merge'
+                  ? 'Drag to reorder stops — click a group to expand it'
+                  : 'Click a row to expand its details'}
             </p>
           </div>
           <div className="inline-flex items-center rounded-lg border border-gray-200 dark:border-navy-700 bg-gray-50/70 dark:bg-navy-800/60 p-0.5 gap-0.5 shrink-0">
@@ -1149,7 +1202,7 @@ export default function ManifestDetailPage() {
         </div>
 
         <div className="divide-y divide-gray-50 dark:divide-navy-800/70">
-          {(() => { let mergeRowCounter = 0; return orderedJobs.map((job, index) => {
+          {(() => { let mergeRowCounter = 0; return orderedJobs.map(job => {
             const selected = selectedJobId === job.id;
             const pages = pageRangeLabel(job);
             const jobMultiPackage = job.packages.length > 1;
@@ -1171,6 +1224,12 @@ export default function ManifestDetailPage() {
             // HAWBs shouldn't renumber every stop after it.
             if (!isGroupParent || isFirstInGroup) mergeRowCounter += 1;
             const rowNumber = mergeRowCounter;
+            // Reordering is a Merge-view affordance only; the List view is a
+            // flat read of every HAWB. Every row of a group shares the group's
+            // slot, so members of an expanded group are valid drop targets even
+            // though only its header is draggable.
+            const slotIndex = rowNumber - 1;
+            const reorderable = !locked && runOrderView === 'merge';
 
             if (isGroupParent && !groupExpanded) {
               const matchedOn = groupKey.startsWith('to:') ? 'Same To' : 'Same Shipper Contact';
@@ -1182,8 +1241,12 @@ export default function ManifestDetailPage() {
               return (
                 <div key={groupKey}>
                   <div
+                    draggable={reorderable}
+                    onDragStart={() => setDragIndex(slotIndex)}
+                    onDragOver={reorderable ? (e: React.DragEvent) => { e.preventDefault(); handleSlotDragOver(slotIndex); } : undefined}
+                    onDrop={reorderable ? handleDrop : undefined}
                     onClick={() => setExpandedGroups(prev => new Set(prev).add(groupKey))}
-                    className="grid grid-cols-[24px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_110px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25"
+                    className={`grid grid-cols-[24px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_110px] gap-2 items-center px-4 py-2.5 text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25 ${reorderable ? 'cursor-move' : 'cursor-pointer'}`}
                   >
                     <div className="col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[346px] bg-blue-50 dark:bg-blue-950/90 grid grid-cols-[24px_190px_100px] gap-2 items-center">
                       <span className="text-gray-900 dark:text-gray-100 font-mono">{rowNumber}</span>
@@ -1239,10 +1302,10 @@ export default function ManifestDetailPage() {
             }
 
             const dragProps = {
-              draggable: !locked && runOrderView === 'list',
-              onDragStart: () => setDragIndex(index),
-              onDragOver: (e: React.DragEvent) => { e.preventDefault(); handleDragOver(index); },
-              onDrop: handleDrop,
+              draggable: reorderable && !isGroupParent,
+              onDragStart: () => setDragIndex(slotIndex),
+              onDragOver: reorderable ? (e: React.DragEvent) => { e.preventDefault(); handleSlotDragOver(slotIndex); } : undefined,
+              onDrop: reorderable ? handleDrop : undefined,
               onClick: () => setSelectedJobId(cur => (cur === job.id ? null : job.id)),
             };
 
@@ -1260,8 +1323,12 @@ export default function ManifestDetailPage() {
               <div key={job.id}>
                 {isGroupParent && isFirstInGroup && groupExpanded && (
                   <div
+                    draggable={reorderable}
+                    onDragStart={() => setDragIndex(slotIndex)}
+                    onDragOver={reorderable ? (e: React.DragEvent) => { e.preventDefault(); handleSlotDragOver(slotIndex); } : undefined}
+                    onDrop={reorderable ? handleDrop : undefined}
                     onClick={() => setExpandedGroups(prev => { const next = new Set(prev); next.delete(groupKey); return next; })}
-                    className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-50/70 dark:bg-blue-950/20 text-[10.5px] font-semibold text-blue-700 dark:text-blue-400 cursor-pointer hover:bg-blue-100/70 dark:hover:bg-blue-950/40"
+                    className={`flex items-center gap-1.5 px-4 py-1.5 bg-blue-50/70 dark:bg-blue-950/20 text-[10.5px] font-semibold text-blue-700 dark:text-blue-400 hover:bg-blue-100/70 dark:hover:bg-blue-950/40 ${reorderable ? 'cursor-move' : 'cursor-pointer'}`}
                   >
                     <span className="font-mono">{rowNumber}</span>
                     <Combine size={11} strokeWidth={2.25} className="shrink-0" />
