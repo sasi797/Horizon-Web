@@ -51,13 +51,6 @@ const MANIFEST_STATUS_LABEL: Record<string, string> = {
   ignored: 'Ignored (duplicate)',
 };
 
-// Manifest-level fields Indigo's AddJob needs that we don't have a home for
-// yet — captured locally on this page only (see indigoFields state) since
-// the backend's HawbManifestUpdate type doesn't have columns for these.
-type IndigoFields = {
-  service_type: string;
-};
-
 // collection_at/delivery_at are wall-clock times extracted from the HAWB PDF,
 // stored with a fake UTC tag purely to fit a timestamptz column (see
 // hawb_ingest._parse_dt) — they aren't real UTC instants. Reading the digits
@@ -570,11 +563,9 @@ export default function ManifestDetailPage() {
   const [syncedFormFor, setSyncedFormFor] = useState<string | null>(null);
   const [manifestFields, setManifestFields] = useState({
     start_point: '', end_point: '', job_reference: '', account_number: '', vehicle_size: '',
+    service_type: '',
   });
   const [syncedPointsFor, setSyncedPointsFor] = useState<string | undefined>(undefined);
-  // Indigo AddJob fields with no backend column yet — local to this page only,
-  // so they reset on reload until the backend adds real storage for them.
-  const [indigoFields, setIndigoFields] = useState<IndigoFields>({ service_type: 'Sameday' });
 
   // Auto-apply pending blind-companion/duplicate merges as soon as they're seen —
   // no manual "Apply" click needed. Already-exported (locked) jobs are the one
@@ -636,6 +627,7 @@ export default function ManifestDetailPage() {
         job_reference: manifest.job_reference ?? '',
         account_number: manifest.account_number ?? '',
         vehicle_size: manifest.vehicle_size ?? '',
+        service_type: manifest.service_type ?? '',
       });
     }
   }, [manifest, syncedPointsFor]);
@@ -753,7 +745,7 @@ export default function ManifestDetailPage() {
     !manifestFields.job_reference && 'Job reference',
     !manifestFields.account_number && 'Account number',
     !manifestFields.vehicle_size && 'Vehicle size',
-    !indigoFields.service_type && 'Service type',
+    !manifestFields.service_type && 'Service type',
     jobsMissingService > 0 && `Del/Coll on ${jobsMissingService} job${jobsMissingService === 1 ? '' : 's'}`,
     jobsWithIncompleteAddress > 0 && `Shipper/Consignee details on ${jobsWithIncompleteAddress} job${jobsWithIncompleteAddress === 1 ? '' : 's'}`,
   ].filter((v): v is string => Boolean(v));
@@ -815,7 +807,7 @@ export default function ManifestDetailPage() {
   };
 
   const saveManifestField = async (
-    field: 'start_point' | 'end_point' | 'job_reference' | 'account_number' | 'vehicle_size',
+    field: 'start_point' | 'end_point' | 'job_reference' | 'account_number' | 'vehicle_size' | 'service_type',
     value: string,
   ) => {
     if (locked) return;
@@ -860,7 +852,7 @@ export default function ManifestDetailPage() {
     try {
       const { results } = await indigoExportManifest({
         manifestId: manifest.id,
-        service_type: indigoFields.service_type,
+        service_type: manifestFields.service_type,
       }).unwrap();
 
       // Per Indigo's doc, JobNumber is only populated "on success" — a
@@ -1102,11 +1094,14 @@ export default function ManifestDetailPage() {
             <PropLabel icon={List} iconTone={ROW2_ICON_TONE} required>Service type</PropLabel>
             <LocationSelect
               disabled={locked}
-              value={indigoFields.service_type}
+              value={manifestFields.service_type}
               emptyLabel="Empty"
               tag="blue"
-              options={withCurrentValue(serviceTypeOptions, indigoFields.service_type)}
-              onChange={value => setIndigoFields(f => ({ ...f, service_type: value }))}
+              options={withCurrentValue(serviceTypeOptions, manifestFields.service_type)}
+              onChange={value => {
+                setManifestFields(f => ({ ...f, service_type: value }));
+                saveManifestField('service_type', value);
+              }}
             />
           </div>
           <div className="min-w-0">

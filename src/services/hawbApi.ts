@@ -109,6 +109,7 @@ export interface HawbManifest {
   job_reference: string | null;
   account_number: string | null;
   vehicle_size: string | null;
+  service_type: string | null;
   created_by: string | null;
   created_by_name: string | null;
   source_kind: 'plain' | 'blind';
@@ -138,6 +139,7 @@ export interface HawbManifestUpdate {
   job_reference?: string | null;
   account_number?: string | null;
   vehicle_size?: string | null;
+  service_type?: string | null;
 }
 
 export interface HawbManifestDetail extends HawbManifest {
