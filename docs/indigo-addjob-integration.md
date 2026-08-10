@@ -63,12 +63,39 @@ codes, provided by the client.
 
 ## Merged HAWBs on export
 
-Jobs sharing the exact same collection *and* delivery address
-(`group_jobs_by_route` server-side — the same grouping that drives the
-"Merge" run-order view on the frontend) collapse into **one** Indigo `Job` on
-export, with `Packs`/`Weight` summed across the group. This applies
-regardless of whether List or Merge view is currently selected — it's a fact
-about the physical run, not a display preference.
+`AdditionalDrops` is the "Merge" run-order view, one drop per row on screen, in
+the same order — what the user merged and reordered on the manifest is exactly
+what gets booked. `group_jobs_by_merge` server-side mirrors the frontend's
+`routeGroups` (same-To first, then same-shipper-contact among what's left; a key
+only one HAWB matched isn't a merge). **The two rules have to change together** —
+they drifted apart once already, the backend grouping on the (shipper, consignee)
+pair while the frontend grouped on the To, and one manifest reported 4 stops on
+screen while 7 drops went to Indigo. `Packs`/`Weight` are summed across a group;
+`DateTime` is the **earliest** of its members, since the driver makes one visit
+and has to satisfy the tightest constraint.
+
+The merge rule keys on paperwork, not geography, so two guards run before the
+payload is built (both 409, both listing the HAWB numbers):
+
+- **Blank Del/Coll.** The leg decides which end of a HAWB the driver visits — a
+  collection stops at the `From`, a delivery at the `To`. With it unset there's
+  no address to book, and defaulting it would silently pick a country.
+- **A group that can't resolve to one address.** Members must agree on the leg
+  *and* on the address that leg stops at. Neither is implied by the merge rule:
+  a group keyed on the To whose members are collections is keyed on somewhere
+  nobody visits, and its pickups can sit in different countries. Unchecked, the
+  drop takes whichever HAWB sorted first and the rest vanish from the payload —
+  a driver sent to California for a run out of St. Mary's.
+
+Note the second guard means a valid merge is one where the merge key and the
+Del/Coll leg agree: a **Same To** group wants Deliveries, a **Same Shipper
+Contact** group wants Collections. Set the legs from the UK end of each route
+(what `defaultServiceType` does) and that holds automatically.
+
+Two groups can legitimately resolve to the same address — e.g. St. Mary's
+HAWBs split across a Same Shipper Contact group and a Same To group — and that
+books as two drops at one postcode. That's the Merge view's shape being honoured
+rather than second-guessed.
 
 Since Indigo's schema has no field for "one job, multiple consignments",
 `JobReference`/`ConsignmentNo` on a merged job carry only the *first* HAWB

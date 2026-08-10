@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Check, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Navigation, Flag, Ban, List, Combine, Weight, User, CalendarClock, Truck } from 'lucide-react';
+import { ChevronDown, Check, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Navigation, Flag, Ban, List, Combine, Weight, CalendarClock, Truck } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestQuery,
@@ -725,6 +725,9 @@ export default function ManifestDetailPage() {
   const packageCount = orderedJobs.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
   const jobIdsWithUpdates = new Set(jobUpdates.map(u => u.job_id));
   const jobsMissingService = orderedJobs.filter(j => !j.job_service_type).length;
+  // The whole manifest books as one Indigo Job, so every HAWB on it carries the
+  // same JobNumber — the first one that has it is the manifest's number.
+  const indigoJobNumber = orderedJobs.find(j => j.indigo_job_number)?.indigo_job_number ?? null;
   // A parsed shipper/consignee field only blocks export if it still holds the
   // literal "Blinded Data" placeholder an extractor drops in for a redacted
   // blinded-trial address. Blank fields are allowed through — e.g. addresses
@@ -1011,12 +1014,9 @@ export default function ManifestDetailPage() {
             <p className={`text-[12.5px] font-semibold truncate ${dgCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-gray-100'}`}>{dgCount}</p>
           </div>
           <div className="min-w-0 rounded-md px-2 py-1.5 -mx-2">
-            <PropLabel icon={User} iconTone={ROW1_ICON_TONE}>Created by</PropLabel>
-            <p className="flex items-center gap-1.5 text-[12.5px] font-medium text-gray-800 dark:text-gray-100 truncate">
-              <span className="w-4 h-4 rounded-full bg-gray-300 dark:bg-navy-700 text-white text-[8px] font-bold flex items-center justify-center shrink-0">
-                {(manifest.created_by_name ?? 'System').charAt(0).toUpperCase()}
-              </span>
-              {manifest.created_by_name ?? 'System'}
+            <PropLabel icon={Hash} iconTone={ROW1_ICON_TONE}>Indigo job</PropLabel>
+            <p className="text-[12.5px] font-medium font-mono text-gray-800 dark:text-gray-100 truncate">
+              {indigoJobNumber ?? '—'}
             </p>
           </div>
           <div className="min-w-0 rounded-md px-2 py-1.5 -mx-2">
