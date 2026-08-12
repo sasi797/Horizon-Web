@@ -87,6 +87,7 @@ const TABLE_COLUMNS: { label: string; icon: typeof CaseSensitive; sortKey?: Sort
 ];
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
+const DEFAULT_PAGE_SIZE = 50;
 
 const HAWB_PREVIEW_COUNT = 2;
 
@@ -365,7 +366,7 @@ export default function ManifestsPage() {
   const [search, setSearch] = useState('');
   const [statusTab, setStatusTab] = useState<'all' | 'open' | 'pending' | 'exported'>('all');
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>(null);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [page, setPage] = useState(0);
   const [retryExtraction, { isLoading: retrying, originalArgs: retryingManifestId }] = useRetryManifestExtractionMutation();
 
