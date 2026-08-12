@@ -499,7 +499,7 @@ export default function ManifestsPage() {
         <ApiErrorState title="Failed to load manifests" onRetry={refetch} />
       ) : (
         <motion.div variants={staggerItem} className="bg-white dark:bg-navy-900 border border-gray-100 dark:border-navy-800 rounded-2xl overflow-hidden">
-          <div className="overflow-auto max-h-[68vh]">
+          <div className="overflow-auto max-h-[71vh]">
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 z-20 bg-white dark:bg-navy-900">
                 <tr className="border-b border-gray-200 dark:border-navy-700">
