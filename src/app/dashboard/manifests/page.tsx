@@ -29,7 +29,8 @@ const STATUS_BADGE: Record<string, string> = {
 // Extract column (loading / completed / failed / ignored) carries the meaningful
 // state. "ignored" is a same-filename resend that was skipped before extraction
 // ever ran — distinct from "failed" (an extraction attempt that broke) since
-// it's never retryable.
+// it's never retryable. Non-PDF attachments never appear here at all: only PDFs
+// are accepted, and anything else is dropped at ingest without a manifest.
 const EXTRACT_BADGE: Record<'loading' | 'completed' | 'failed' | 'ignored', string> = {
   loading: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400',
   completed: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400',

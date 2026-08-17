@@ -1142,7 +1142,9 @@ export default function ManifestDetailPage() {
                 ? 'Manifest is exported and locked'
                 : runOrderView === 'merge'
                   ? 'Drag to reorder stops — click a group to expand it'
-                  : 'Click a row to expand its details'}
+                  : routeGroups.size === 0
+                    ? 'Drag to reorder — click a row to expand its details'
+                    : 'Click a row to expand its details'}
             </p>
           </div>
           <div className="inline-flex items-center rounded-lg border border-gray-200 dark:border-navy-700 bg-gray-50/70 dark:bg-navy-800/60 p-0.5 gap-0.5 shrink-0">
@@ -1219,12 +1221,14 @@ export default function ManifestDetailPage() {
             // HAWBs shouldn't renumber every stop after it.
             if (!isGroupParent || isFirstInGroup) mergeRowCounter += 1;
             const rowNumber = mergeRowCounter;
-            // Reordering is a Merge-view affordance only; the List view is a
-            // flat read of every HAWB. Every row of a group shares the group's
-            // slot, so members of an expanded group are valid drop targets even
-            // though only its header is draggable.
+            // Reordering is a Merge-view affordance — except when there's nothing
+            // to merge (no shared routes at all), in which case List and Merge
+            // render identically and dragging works right there in List too.
+            // Every row of a group shares the group's slot, so members of an
+            // expanded group are valid drop targets even though only its header
+            // is draggable.
             const slotIndex = rowNumber - 1;
-            const reorderable = !locked && runOrderView === 'merge';
+            const reorderable = !locked && (runOrderView === 'merge' || routeGroups.size === 0);
 
             if (isGroupParent && !groupExpanded) {
               const matchedOn = groupKey.startsWith('to:') ? 'Same To' : 'Same Shipper Contact';
