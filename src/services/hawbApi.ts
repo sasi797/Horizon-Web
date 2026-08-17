@@ -47,6 +47,7 @@ export interface HawbJob {
   status: 'pending_review' | 'ready_to_manifest' | 'manifested';
   manifest_id: string | null;
   manifest_sequence: number | null;
+  manual_group_id: string | null;
   locked: boolean;
   ready_at: string | null;
   manifested_at: string | null;
@@ -93,6 +94,7 @@ export interface HawbJobUpdate {
   special_handling?: string | null;
   job_service_type?: 'delivery' | 'collection' | 'collection_and_delivery' | null;
   indigo_job_number?: string | null;
+  manual_group_id?: string | null;
 }
 
 export interface HawbManifest {

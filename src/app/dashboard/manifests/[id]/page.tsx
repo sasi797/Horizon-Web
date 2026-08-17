@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Check, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Navigation, Flag, Ban, List, Combine, Weight, CalendarClock, Truck } from 'lucide-react';
+import { ChevronDown, Check, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Navigation, Flag, Ban, List, Combine, Weight, CalendarClock, Truck, Ungroup, RotateCcw } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestQuery,
@@ -559,6 +559,7 @@ export default function ManifestDetailPage() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [runOrderView, setRunOrderView] = useState<'list' | 'merge'>('list');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [selectedForMerge, setSelectedForMerge] = useState<Set<string>>(new Set());
   const [jobForm, setJobForm] = useState<JobForm | null>(null);
   const [syncedFormFor, setSyncedFormFor] = useState<string | null>(null);
   const [manifestFields, setManifestFields] = useState({
@@ -593,6 +594,10 @@ export default function ManifestDetailPage() {
       setOrderedJobs(manifest.jobs);
     }
   }, [manifest, syncedJobs]);
+
+  useEffect(() => {
+    if (runOrderView !== 'merge') setSelectedForMerge(new Set());
+  }, [runOrderView]);
 
   // Fill in Del/Coll for any job the extractor left blank, from the route's UK
   // leg (see defaultServiceType). Only ever fills a blank — an extracted or
@@ -661,8 +666,15 @@ export default function ManifestDetailPage() {
   const jobGroupKey = new Map<string, string>();
   const groupedJobIds = new Set<string>();
 
+  // A job with manual_group_id set (manually merged or manually unmerged via
+  // the Merge view) is excluded from the To/contact auto-heuristic entirely —
+  // it's grouped purely by that override below — so a manual choice can never
+  // pull other jobs into its bucket, and unmerging one job never breaks the
+  // auto-grouping of whoever it's left behind.
+  const autoJobs = orderedJobs.filter(j => !j.manual_group_id);
+
   const byConsignee = new Map<string, HawbJob[]>();
-  for (const job of orderedJobs) {
+  for (const job of autoJobs) {
     const identity = addressIdentityKey(job.consignee);
     if (!identity) continue;
     const group = byConsignee.get(identity);
@@ -676,7 +688,7 @@ export default function ManifestDetailPage() {
   }
 
   const byShipperContact = new Map<string, HawbJob[]>();
-  for (const job of orderedJobs) {
+  for (const job of autoJobs) {
     if (groupedJobIds.has(job.id)) continue;
     const contact = job.shipper_contact?.trim().toLowerCase().replace(/\s+/g, ' ');
     if (!contact) continue;
@@ -688,6 +700,18 @@ export default function ManifestDetailPage() {
     const key = `contact:${contact}`;
     routeGroups.set(key, jobs);
     jobs.forEach(j => { jobGroupKey.set(j.id, key); groupedJobIds.add(j.id); });
+  }
+
+  const byManualGroup = new Map<string, HawbJob[]>();
+  for (const job of orderedJobs) {
+    if (!job.manual_group_id) continue;
+    const group = byManualGroup.get(job.manual_group_id);
+    if (group) group.push(job); else byManualGroup.set(job.manual_group_id, [job]);
+  }
+  for (const [groupId, jobs] of byManualGroup) {
+    const key = `manual:${groupId}`;
+    routeGroups.set(key, jobs);
+    jobs.forEach(j => jobGroupKey.set(j.id, key));
   }
 
   for (const job of orderedJobs) {
@@ -843,6 +867,14 @@ export default function ManifestDetailPage() {
       setJobForm(f => f && ({ ...f, job_service_type: value }));
     }
     saveJobField(jobId, 'job_service_type', value);
+  };
+
+  const handleMergeSelected = async () => {
+    if (locked || selectedForMerge.size < 2) return;
+    const groupId = crypto.randomUUID?.() ?? `grp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const ids = Array.from(selectedForMerge);
+    await Promise.all(ids.map(id => saveJobField(id, 'manual_group_id', groupId)));
+    setSelectedForMerge(new Set());
   };
 
   const handleExport = async () => {
@@ -1179,10 +1211,36 @@ export default function ManifestDetailPage() {
           </div>
         </div>
 
+        {runOrderView === 'merge' && selectedForMerge.size > 0 && (
+          <div className="flex items-center justify-between px-4 py-2 bg-emerald-50 dark:bg-emerald-950/20 border-b border-emerald-100 dark:border-emerald-900/40">
+            <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+              {selectedForMerge.size} HAWB{selectedForMerge.size === 1 ? '' : 's'} selected
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedForMerge(new Set())}
+                className="px-2 py-1 rounded-md text-[10.5px] font-bold text-gray-500 dark:text-navy-400 hover:bg-white dark:hover:bg-navy-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={selectedForMerge.size < 2 || locked}
+                onClick={handleMergeSelected}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-bold bg-emerald-600 text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-emerald-700"
+              >
+                <Combine size={12} strokeWidth={2.25} />
+                Merge {selectedForMerge.size} selected
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
         <div className="min-w-[1630px]">
-        <div className="grid grid-cols-[24px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_110px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
-          <div className="col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[346px] bg-white dark:bg-navy-900 grid grid-cols-[24px_190px_100px] gap-2">
+        <div className="grid grid-cols-[36px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_110px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
+          <div className="col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[358px] bg-white dark:bg-navy-900 grid grid-cols-[36px_190px_100px] gap-2">
             <span>#</span>
             <span>HAWB</span>
             <span>Service</span>
@@ -1231,7 +1289,11 @@ export default function ManifestDetailPage() {
             const reorderable = !locked && (runOrderView === 'merge' || routeGroups.size === 0);
 
             if (isGroupParent && !groupExpanded) {
-              const matchedOn = groupKey.startsWith('to:') ? 'Same To' : 'Same Shipper Contact';
+              const matchedOn = groupKey.startsWith('to:')
+                ? 'Same To'
+                : groupKey.startsWith('contact:')
+                  ? 'Same Shipper Contact'
+                  : 'Manually merged';
               const collTimes = routeGroup.map(j => j.collection_at ? formatTime(j.collection_at) : '—');
               const delTimes = routeGroup.map(j => j.delivery_at ? formatTime(j.delivery_at) : '—');
               const services = routeGroup.map(j => j.job_service_type ?? '');
@@ -1245,9 +1307,9 @@ export default function ManifestDetailPage() {
                     onDragOver={reorderable ? (e: React.DragEvent) => { e.preventDefault(); handleSlotDragOver(slotIndex); } : undefined}
                     onDrop={reorderable ? handleDrop : undefined}
                     onClick={() => setExpandedGroups(prev => new Set(prev).add(groupKey))}
-                    className={`grid grid-cols-[24px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_110px] gap-2 items-center px-4 py-2.5 text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25 ${reorderable ? 'cursor-move' : 'cursor-pointer'}`}
+                    className={`grid grid-cols-[36px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_110px] gap-2 items-center px-4 py-2.5 text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25 ${reorderable ? 'cursor-move' : 'cursor-pointer'}`}
                   >
-                    <div className="col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[346px] bg-blue-50 dark:bg-blue-950/90 grid grid-cols-[24px_190px_100px] gap-2 items-center">
+                    <div className="col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[358px] bg-blue-50 dark:bg-blue-950/90 grid grid-cols-[36px_190px_100px] gap-2 items-center">
                       <span className="text-gray-900 dark:text-gray-100 font-mono">{rowNumber}</span>
                       <div className="min-w-0 py-1">
                         <div className="flex items-center gap-1.5">
@@ -1331,19 +1393,34 @@ export default function ManifestDetailPage() {
                   >
                     <span className="font-mono">{rowNumber}</span>
                     <Combine size={11} strokeWidth={2.25} className="shrink-0" />
-                    {routeGroup.length} HAWBs share this route ({groupKey.startsWith('to:') ? 'same To' : 'same shipper contact'}) — click to collapse
+                    {routeGroup.length} HAWBs share this route ({groupKey.startsWith('to:') ? 'same To' : groupKey.startsWith('contact:') ? 'same shipper contact' : 'manually merged'}) — click to collapse
                   </div>
                 )}
                 <div
                   {...dragProps}
-                  className={`grid grid-cols-[24px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_110px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
+                  className={`grid grid-cols-[36px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_110px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
                     isGroupParent ? 'bg-blue-50/25 dark:bg-blue-950/10' : ''
                   } ${
                     selected ? 'bg-emerald-50/70 dark:bg-emerald-950/25' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
                   }`}
                 >
-                  <div className={`col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[346px] ${stickyBg} grid grid-cols-[24px_190px_100px] gap-2 items-center`}>
-                    <span className="text-gray-900 dark:text-gray-100 font-mono">{isGroupParent && groupExpanded ? '' : rowNumber}</span>
+                  <div className={`col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[358px] ${stickyBg} grid grid-cols-[36px_190px_100px] gap-2 items-center`}>
+                    <div className="flex items-center gap-1">
+                      {runOrderView === 'merge' && !locked && (
+                        <input
+                          type="checkbox"
+                          checked={selectedForMerge.has(job.id)}
+                          onClick={e => e.stopPropagation()}
+                          onChange={() => setSelectedForMerge(prev => {
+                            const next = new Set(prev);
+                            if (next.has(job.id)) next.delete(job.id); else next.add(job.id);
+                            return next;
+                          })}
+                          className="w-3 h-3 rounded cursor-pointer accent-emerald-600 shrink-0"
+                        />
+                      )}
+                      <span className="text-gray-900 dark:text-gray-100 font-mono">{isGroupParent && groupExpanded ? '' : rowNumber}</span>
+                    </div>
                     <div className="min-w-0 flex items-center gap-1.5">
                       <ChevronDown size={11} className={`text-gray-300 dark:text-navy-600 shrink-0 transition-transform ${selected ? 'rotate-0' : '-rotate-90'}`} />
                       <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 truncate min-w-0">{job.hawb_number}</span>
@@ -1352,6 +1429,28 @@ export default function ManifestDetailPage() {
                       </span>
                       {job.dangerous_goods_notes && <TriangleAlert size={10} className="text-red-500 shrink-0" />}
                       {jobIdsWithUpdates.has(job.id) && <RefreshCw size={10} className="text-orange-500 shrink-0" />}
+                      {runOrderView === 'merge' && !locked && !job.manual_group_id && routeGroup.length > 1 && (
+                        <Tooltip content="Remove from group — becomes its own stop" side="top">
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); saveJobField(job.id, 'manual_group_id', job.id); }}
+                            className="shrink-0 text-gray-400 hover:text-red-500"
+                          >
+                            <Ungroup size={11} />
+                          </button>
+                        </Tooltip>
+                      )}
+                      {runOrderView === 'merge' && !locked && job.manual_group_id && (
+                        <Tooltip content="Reset to automatic grouping" side="top">
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); saveJobField(job.id, 'manual_group_id', null); }}
+                            className="shrink-0 text-gray-400 hover:text-emerald-600"
+                          >
+                            <RotateCcw size={11} />
+                          </button>
+                        </Tooltip>
+                      )}
                     </div>
                     <div className="flex">
                       <ServiceTypePicker
