@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Check, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Navigation, Flag, Ban, List, Combine, Weight, CalendarClock, Truck, Ungroup, RotateCcw } from 'lucide-react';
+import { ChevronDown, Check, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Navigation, Flag, Ban, List, Combine, Weight, CalendarClock, Truck, Ungroup } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestQuery,
@@ -1429,7 +1429,7 @@ export default function ManifestDetailPage() {
                       </span>
                       {job.dangerous_goods_notes && <TriangleAlert size={10} className="text-red-500 shrink-0" />}
                       {jobIdsWithUpdates.has(job.id) && <RefreshCw size={10} className="text-orange-500 shrink-0" />}
-                      {runOrderView === 'merge' && !locked && !job.manual_group_id && routeGroup.length > 1 && (
+                      {runOrderView === 'merge' && !locked && routeGroup.length > 1 && (
                         <Tooltip content="Remove from group — becomes its own stop" side="top">
                           <button
                             type="button"
@@ -1437,17 +1437,6 @@ export default function ManifestDetailPage() {
                             className="shrink-0 text-gray-400 hover:text-red-500"
                           >
                             <Ungroup size={11} />
-                          </button>
-                        </Tooltip>
-                      )}
-                      {runOrderView === 'merge' && !locked && job.manual_group_id && (
-                        <Tooltip content="Reset to automatic grouping" side="top">
-                          <button
-                            type="button"
-                            onClick={e => { e.stopPropagation(); saveJobField(job.id, 'manual_group_id', null); }}
-                            className="shrink-0 text-gray-400 hover:text-emerald-600"
-                          >
-                            <RotateCcw size={11} />
                           </button>
                         </Tooltip>
                       )}
