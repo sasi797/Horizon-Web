@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Check, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Navigation, Flag, Ban, List, Combine, Weight, CalendarClock, Truck, Ungroup } from 'lucide-react';
+import { ChevronDown, Check, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Navigation, Flag, Ban, List, Combine, Weight, CalendarClock, Truck, Ungroup, Undo2 } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestQuery,
@@ -22,7 +22,7 @@ import {
 import ApiErrorState from '@/components/ApiErrorState';
 import Tooltip from '@/components/Tooltip';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import { splitAddress, cityLine, cityAndPostcodeLine, parseAddressParts, buildAddress, addressIdentityKey, isUkAddress, type AddressParts } from '@/lib/hawbFormat';
+import { splitAddress, cityLine, cityAndPostcodeLine, parseAddressParts, buildAddress, addressIdentityKey, isUkAddress, isBackhaulCollection, type AddressParts } from '@/lib/hawbFormat';
 import { useGetDropdownValuesQuery } from '@/services/dropdownApi';
 
 const MANIFEST_STATUS_BADGE: Record<string, string> = {
@@ -90,6 +90,20 @@ function pageRangeLabel(job: HawbJob): string | null {
   const count = job.packages.length || 1;
   const end = job.page_start + count - 1;
   return count > 1 ? `Pages ${job.page_start}–${end}` : `Page ${job.page_start}`;
+}
+
+// Flags a Coll row whose pickup is the manifest's own End point — Indigo
+// export skips these (see is_backhaul_collection in Horizon-Api), so the tag
+// tells the reader this HAWB won't get its own AdditionalDrops entry.
+function BackhaulBadge() {
+  return (
+    <span
+      title="Coll matches the manifest's End point — Indigo export won't book this as its own additional drop"
+      className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-1 py-px rounded w-fit"
+    >
+      <Undo2 size={9} strokeWidth={2.25} /> Backhaul collection
+    </span>
+  );
 }
 
 function Skel({ className = '' }: { className?: string }) {
@@ -1260,6 +1274,7 @@ export default function ManifestDetailPage() {
           {(() => { let mergeRowCounter = 0; return orderedJobs.map(job => {
             const selected = selectedJobId === job.id;
             const pages = pageRangeLabel(job);
+            const backhaul = isBackhaulCollection(job, manifestFields.end_point);
             const jobMultiPackage = job.packages.length > 1;
             const jobPackagesHaveDetail = job.packages.some(p => p.temperature_range || p.dimensions);
             const jobShowCombinedTempDims = !jobMultiPackage || !jobPackagesHaveDetail;
@@ -1299,6 +1314,10 @@ export default function ManifestDetailPage() {
               const services = routeGroup.map(j => j.job_service_type ?? '');
               const totalPkg = routeGroup.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
               const totalWt = routeGroup.reduce((sum, j) => sum + (j.weight_kg ?? 0), 0);
+              // Export only skips this whole merged stop when every member is a
+              // backhaul collection — a mix still books normally, so the
+              // collapsed summary only flags the all-backhaul case.
+              const groupBackhaul = routeGroup.every(j => isBackhaulCollection(j, manifestFields.end_point));
               return (
                 <div key={groupKey}>
                   <div
@@ -1325,6 +1344,11 @@ export default function ManifestDetailPage() {
                             </div>
                           ))}
                         </div>
+                        {groupBackhaul && (
+                          <div className="mt-0.5">
+                            <BackhaulBadge />
+                          </div>
+                        )}
                       </div>
                       <div className="flex">
                         {(() => {
@@ -1421,24 +1445,31 @@ export default function ManifestDetailPage() {
                       )}
                       <span className="text-gray-900 dark:text-gray-100 font-mono">{isGroupParent && groupExpanded ? '' : rowNumber}</span>
                     </div>
-                    <div className="min-w-0 flex items-center gap-1.5">
-                      <ChevronDown size={11} className={`text-gray-300 dark:text-navy-600 shrink-0 transition-transform ${selected ? 'rotate-0' : '-rotate-90'}`} />
-                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 truncate min-w-0">{job.hawb_number}</span>
-                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-500 dark:text-blue-400 shrink-0">
-                        <FileText size={10} />{pages ?? 'Page 1'}
-                      </span>
-                      {job.dangerous_goods_notes && <TriangleAlert size={10} className="text-red-500 shrink-0" />}
-                      {jobIdsWithUpdates.has(job.id) && <RefreshCw size={10} className="text-orange-500 shrink-0" />}
-                      {runOrderView === 'merge' && !locked && routeGroup.length > 1 && (
-                        <Tooltip content="Remove from group — becomes its own stop" side="top">
-                          <button
-                            type="button"
-                            onClick={e => { e.stopPropagation(); saveJobField(job.id, 'manual_group_id', job.id); }}
-                            className="shrink-0 text-gray-400 hover:text-red-500"
-                          >
-                            <Ungroup size={11} />
-                          </button>
-                        </Tooltip>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <ChevronDown size={11} className={`text-gray-300 dark:text-navy-600 shrink-0 transition-transform ${selected ? 'rotate-0' : '-rotate-90'}`} />
+                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 truncate min-w-0">{job.hawb_number}</span>
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-500 dark:text-blue-400 shrink-0">
+                          <FileText size={10} />{pages ?? 'Page 1'}
+                        </span>
+                        {job.dangerous_goods_notes && <TriangleAlert size={10} className="text-red-500 shrink-0" />}
+                        {jobIdsWithUpdates.has(job.id) && <RefreshCw size={10} className="text-orange-500 shrink-0" />}
+                        {runOrderView === 'merge' && !locked && routeGroup.length > 1 && (
+                          <Tooltip content="Remove from group — becomes its own stop" side="top">
+                            <button
+                              type="button"
+                              onClick={e => { e.stopPropagation(); saveJobField(job.id, 'manual_group_id', job.id); }}
+                              className="shrink-0 text-gray-400 hover:text-red-500"
+                            >
+                              <Ungroup size={11} />
+                            </button>
+                          </Tooltip>
+                        )}
+                      </div>
+                      {backhaul && (
+                        <div className="pl-[15px] mt-0.5">
+                          <BackhaulBadge />
+                        </div>
                       )}
                     </div>
                     <div className="flex">

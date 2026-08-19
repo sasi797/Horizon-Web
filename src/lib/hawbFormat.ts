@@ -25,6 +25,20 @@ export function addressIdentityKey(value: string | null): string | null {
   return `${name}|${last}`;
 }
 
+// A collection whose pickup site is the same place as the manifest's End
+// point isn't a real extra stop — the vehicle is already headed there as the
+// run's last stop, so the Indigo export skips booking it again as its own
+// AdditionalDrops entry (see Horizon-Api's indigo_export.is_backhaul_collection,
+// which this mirrors exactly).
+export function isBackhaulCollection(
+  job: { job_service_type: string | null; shipper: string | null },
+  endPoint: string | null,
+): boolean {
+  if (job.job_service_type !== 'collection') return false;
+  const identity = addressIdentityKey(job.shipper);
+  return identity !== null && identity === addressIdentityKey(endPoint);
+}
+
 const UK_POSTCODE_RE = /[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
 const EIRCODE_RE = /[A-Z]\d{2}\s?[A-Z0-9]{4}\b/i;
 const NUMERIC_POSTCODE_RE = /\b\d{4,6}\b/;
