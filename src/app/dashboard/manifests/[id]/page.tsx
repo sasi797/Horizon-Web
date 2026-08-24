@@ -795,13 +795,22 @@ export default function ManifestDetailPage() {
   // fields 'start_point'/'end_point') plus, per job, whichever address matches its
   // Service selection — Coll contributes its collection (from) address, Del its
   // delivery (to) address — into both pickers, since either can turn out to be the
-  // manifest's actual route start or end.
+  // manifest's actual route start or end. When a job is UK-to-UK on both ends,
+  // defaultServiceType can't tell which side is the actual collect vs deliver, so
+  // once a service type is picked (either one), both addresses go in as candidates.
   const jobPointCandidates = new Map<string, string>();
+  const addPointCandidate = (address: string) => {
+    jobPointCandidates.set(address, [splitAddress(address).name, cityLine(address)].filter(Boolean).join(' · '));
+  };
   orderedJobs.forEach(j => {
-    if (j.job_service_type === 'collection' && j.shipper) {
-      jobPointCandidates.set(j.shipper, [splitAddress(j.shipper).name, cityLine(j.shipper)].filter(Boolean).join(' · '));
+    if (!j.job_service_type) return;
+    if (isUkAddress(j.shipper) && isUkAddress(j.consignee)) {
+      if (j.shipper) addPointCandidate(j.shipper);
+      if (j.consignee) addPointCandidate(j.consignee);
+    } else if (j.job_service_type === 'collection' && j.shipper) {
+      addPointCandidate(j.shipper);
     } else if (j.job_service_type === 'delivery' && j.consignee) {
-      jobPointCandidates.set(j.consignee, [splitAddress(j.consignee).name, cityLine(j.consignee)].filter(Boolean).join(' · '));
+      addPointCandidate(j.consignee);
     }
   });
   const startOptions = Array.from(
