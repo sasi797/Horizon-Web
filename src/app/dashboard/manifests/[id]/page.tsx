@@ -1466,7 +1466,7 @@ export default function ManifestDetailPage() {
                           </Tooltip>
                         )}
                       </div>
-                      {backhaul && (
+                      {backhaul && orderedJobs.length > 1 && (
                         <div className="pl-[15px] mt-0.5">
                           <BackhaulBadge />
                         </div>
