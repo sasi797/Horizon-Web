@@ -45,7 +45,7 @@ export default function ConfirmDialog({
               <span className={`flex items-center justify-center w-9 h-9 rounded-full shrink-0 ${
                 tone === 'danger'
                   ? 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400'
-                  : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'
               }`}>
                 <TriangleAlert size={16} strokeWidth={2.25} />
               </span>
@@ -71,7 +71,7 @@ export default function ConfirmDialog({
                 className={`text-[12px] font-bold text-white disabled:opacity-60 px-3.5 py-1.5 rounded-lg transition-colors ${
                   tone === 'danger'
                     ? 'bg-red-600 hover:bg-red-700 active:bg-red-800'
-                    : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'
+                    : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
                 }`}
               >
                 {loading ? 'Working…' : confirmLabel}

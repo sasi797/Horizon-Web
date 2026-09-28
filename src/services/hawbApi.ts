@@ -38,7 +38,6 @@ export interface HawbJob {
   direction: string | null;
   special_handling: string | null;
   job_service_type: 'delivery' | 'collection' | 'collection_and_delivery' | null;
-  indigo_job_number: string | null;
   packages: HawbPackageLine[];
   extracted_data: Record<string, unknown>;
   source_kind: 'plain' | 'blind';
@@ -93,7 +92,6 @@ export interface HawbJobUpdate {
   direction?: string | null;
   special_handling?: string | null;
   job_service_type?: 'delivery' | 'collection' | 'collection_and_delivery' | null;
-  indigo_job_number?: string | null;
   manual_group_id?: string | null;
 }
 
@@ -104,14 +102,21 @@ export interface HawbManifest {
   total_weight_kg: number;
   status: 'pending_review' | 'open' | 'booked' | 'confirmed' | 'on_hold' | 'exported' | 'cancelled' | 'extracting' | 'failed' | 'ignored';
   exported_at: string | null;
-  indigo_job_number: string | null;
   cancelled_at: string | null;
   start_point: string | null;
   end_point: string | null;
+  skip_end_destination: boolean;
   job_reference: string | null;
   account_number: string | null;
   vehicle_size: string | null;
   service_type: string | null;
+  indigo_job_number: string | null;
+  indigo_export_status: 'booked' | 'failed' | null;
+  indigo_export_error: string | null;
+  mytransport_order_no: string | null;
+  mytransport_tracking_url: string | null;
+  mytransport_export_status: 'booked' | 'failed' | null;
+  mytransport_export_error: string | null;
   created_by: string | null;
   created_by_name: string | null;
   source_kind: 'plain' | 'blind';
@@ -120,24 +125,27 @@ export interface HawbManifest {
   remarks: string | null;
 }
 
-// Indigo's AddJob response: one result per submitted job, in the same order
-// jobs were sent — server-built, see Horizon-Api's app/services/indigo_export.py.
-export interface IndigoJobResult {
-  JobGuid?: string | null;
-  JobNumber?: string | null;
-  JobReference?: string | null;
-  ErrorCode?: string | number | null;
-  Errormessage?: string | null;
+// Export now books this manifest into Indigo and mytransport/EasyTrans at
+// once, concurrently — see Horizon-Api's app/routers/hawb.py
+// (export_manifest_dual). One can book while the other fails; a manifest
+// with one system still 'failed' can be re-exported to retry only that one.
+export interface ExportSystemResult {
+  status: 'booked' | 'failed' | 'skipped';
+  reference?: string | null;
+  tracking_url?: string | null;
+  error?: string | null;
 }
 
-export interface IndigoExportResult {
-  results: IndigoJobResult[];
-  payload?: Record<string, unknown> | null;
+export interface ExportManifestResult {
+  indigo: ExportSystemResult;
+  mytransport: ExportSystemResult;
+  payloads?: { indigo: Record<string, unknown>; mytransport: Record<string, unknown> } | null;
 }
 
 export interface HawbManifestUpdate {
   start_point?: string | null;
   end_point?: string | null;
+  skip_end_destination?: boolean;
   job_reference?: string | null;
   account_number?: string | null;
   vehicle_size?: string | null;
@@ -192,13 +200,13 @@ export const hawbApi = api.injectEndpoints({
       }),
       invalidatesTags: (_r, _e, manifestId) => [{ type: 'HawbManifest', id: manifestId }],
     }),
-    indigoExportManifest: build.mutation<IndigoExportResult, { manifestId: string; service_type: string; dry_run?: boolean }>({
-      query: ({ manifestId, service_type, dry_run }) => ({
-        url: `/hawb/manifests/${manifestId}/indigo-export`,
+    carrierExportManifest: build.mutation<ExportManifestResult, { manifestId: string; dry_run?: boolean }>({
+      query: ({ manifestId, dry_run }) => ({
+        url: `/hawb/manifests/${manifestId}/carrier-export`,
         method: 'POST',
-        body: { service_type, dry_run },
+        body: { dry_run },
       }),
-      // A dry run only builds and returns the payload — nothing on the
+      // A dry run only builds and returns both payloads — nothing on the
       // manifest/jobs actually changed, so nothing needs refetching.
       invalidatesTags: (_r, _e, { manifestId, dry_run }) =>
         dry_run ? [] : [{ type: 'HawbManifest', id: manifestId }, 'HawbManifest', 'HawbJob'],
@@ -253,7 +261,7 @@ export const {
   useUpdateHawbManifestMutation,
   useReorderManifestJobsMutation,
   useExportManifestMutation,
-  useIndigoExportManifestMutation,
+  useCarrierExportManifestMutation,
   useConfirmManifestMutation,
   useHoldManifestMutation,
   useMarkManifestExportedMutation,

@@ -21,7 +21,7 @@ function Field({ label, children }: { label: React.ReactNode; children: React.Re
   );
 }
 
-const inputClass = 'w-full h-9 px-3 bg-transparent border border-gray-200 dark:border-navy-700 rounded-lg text-[13px] text-gray-800 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-500/60 transition-colors';
+const inputClass = 'w-full h-9 px-3 bg-transparent border border-gray-200 dark:border-navy-700 rounded-lg text-[13px] text-gray-800 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-blue-500/60 transition-colors';
 
 function EditUserPageContent() {
   const { id } = useParams<{ id: string }>();
@@ -137,7 +137,7 @@ function EditUserPageContent() {
           <button
             type="submit"
             disabled={!canSubmit || isSaving}
-            className="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[12.5px] font-semibold transition-colors"
+            className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-[12.5px] font-semibold transition-colors"
           >
             {isSaving ? 'Saving…' : 'Save Changes'}
           </button>
@@ -164,7 +164,7 @@ function EditUserPageContent() {
             className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold transition-colors disabled:opacity-50 ${
               user.is_active
                 ? 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/50'
-                : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/50'
+                : 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-950/50'
             }`}
           >
             <RefreshCw size={12} />

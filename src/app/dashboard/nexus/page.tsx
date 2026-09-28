@@ -13,7 +13,7 @@ import RequireRole from '@/components/RequireRole';
 
 const BASE_INPUT =
   'w-full h-9 px-2.5 rounded-lg border bg-white dark:bg-navy-900 text-[12px] text-gray-800 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none transition-colors';
-const OK_BORDER = 'border-gray-200 dark:border-navy-700 focus:border-emerald-500/60';
+const OK_BORDER = 'border-gray-200 dark:border-navy-700 focus:border-blue-500/60';
 const BAD_BORDER = 'border-red-400 dark:border-red-500/70 focus:border-red-500';
 
 interface Form {
@@ -242,7 +242,7 @@ function NexusPageContent() {
           onClick={run}
           disabled={isLoading || !isComplete}
           title={isComplete ? undefined : 'Fill in every field to continue'}
-          className="inline-flex items-center gap-2 h-8 px-3 rounded-lg bg-emerald-600 text-white text-[12px] font-semibold shadow-sm shadow-emerald-600/20 cursor-pointer transition-colors hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-gray-300 dark:disabled:bg-navy-700 disabled:text-gray-500 dark:disabled:text-navy-500 disabled:shadow-none disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-2 h-8 px-3 rounded-lg bg-blue-600 text-white text-[12px] font-semibold shadow-sm shadow-blue-600/20 cursor-pointer transition-colors hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-300 dark:disabled:bg-navy-700 disabled:text-gray-500 dark:disabled:text-navy-500 disabled:shadow-none disabled:cursor-not-allowed"
         >
           {isLoading ? (
             <Loader2 size={13} strokeWidth={2.5} className="animate-spin" />
@@ -271,10 +271,10 @@ function NexusPageContent() {
       {result && (
         <motion.div
           variants={staggerItem}
-          className="flex items-start gap-2 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-2.5"
+          className="flex items-start gap-2 rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/20 px-3 py-2.5"
         >
-          <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" strokeWidth={2.5} />
-          <div className="text-[12px] text-emerald-800 dark:text-emerald-300 space-y-0.5">
+          <CheckCircle2 size={14} className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" strokeWidth={2.5} />
+          <div className="text-[12px] text-blue-800 dark:text-blue-300 space-y-0.5">
             <p className="font-semibold">Employee created in Nexus.</p>
             <p className="text-[11px] opacity-80">Screenshot: {result.screenshot}</p>
           </div>

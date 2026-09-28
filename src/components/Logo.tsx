@@ -1,7 +1,7 @@
 export default function Logo({ size = 28, className = '' }: { size?: number; className?: string }) {
   const navyStroke = 'stroke-slate-900 dark:stroke-navy-200';
   const navyFill = 'fill-slate-900 dark:fill-navy-200';
-  const greenStroke = 'stroke-emerald-600 dark:stroke-emerald-400';
+  const accentStroke = 'stroke-blue-600 dark:stroke-blue-400';
 
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className}>
@@ -11,8 +11,8 @@ export default function Logo({ size = 28, className = '' }: { size?: number; cla
         <path d="M50 50 L50 10" />
         <path d="M50 50 L85 70" />
       </g>
-      {/* green edges */}
-      <g className={greenStroke} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round">
+      {/* accent edges */}
+      <g className={accentStroke} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round">
         <path d="M50 90 L15 70 L15 30" />
         <path d="M50 50 L15 70" />
       </g>

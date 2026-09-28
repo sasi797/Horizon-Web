@@ -98,7 +98,7 @@ export default function LoginPage() {
           style={{ background: 'linear-gradient(145deg, #0f1f3a 0%, #0a1628 55%, #065f46 130%)' }}
         >
           {/* Green glow */}
-          <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-[36rem] h-[18rem] rounded-full bg-gradient-to-t from-emerald-500/40 via-emerald-400/15 to-transparent blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-[36rem] h-[18rem] rounded-full bg-gradient-to-t from-blue-500/40 via-blue-400/15 to-transparent blur-2xl pointer-events-none" />
 
           {/* Topographic contour lines */}
           <svg className="absolute inset-0 w-full h-full" fill="none" preserveAspectRatio="xMidYMid slice">
@@ -165,7 +165,7 @@ export default function LoginPage() {
               initial={{ opacity: 0, y: 10, rotate: 0 }}
               animate={{ opacity: 1, y: 0, rotate }}
               transition={{ delay, duration: 0.4 }}
-              className="absolute w-11 h-11 rounded-xl bg-white/10 border border-white/20 backdrop-blur-sm shadow-md shadow-black/20 flex items-center justify-center text-emerald-300"
+              className="absolute w-11 h-11 rounded-xl bg-white/10 border border-white/20 backdrop-blur-sm shadow-md shadow-black/20 flex items-center justify-center text-blue-300"
               style={{ top, left }}
             >
               <Icon size={18} />
@@ -192,7 +192,7 @@ export default function LoginPage() {
         {/* ── RIGHT: white form panel ── */}
         <div className="flex-1 bg-white flex flex-col overflow-hidden">
           {/* Accent bar */}
-          <div className="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 shrink-0" />
+          <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 shrink-0" />
 
           <div className="flex-1 flex items-center justify-center px-10 py-8">
             <div className="w-full max-w-[310px]">
@@ -222,7 +222,7 @@ export default function LoginPage() {
                             placeholder="you@example.com" required
                             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-700
                                        placeholder:text-gray-300 bg-gray-50/60
-                                       focus:outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all" />
+                                       focus:outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all" />
                         </div>
                       </div>
 
@@ -236,9 +236,9 @@ export default function LoginPage() {
                             placeholder="••••••••" required
                             className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl text-sm text-gray-700
                                        placeholder:text-gray-300 bg-gray-50/60
-                                       focus:outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all" />
+                                       focus:outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all" />
                           <button type="button" onClick={() => setShowPassword(v => !v)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-500 transition-colors">
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500 transition-colors">
                             {showPassword ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
                           </button>
                         </div>
@@ -246,7 +246,7 @@ export default function LoginPage() {
 
                       <div className="flex items-center justify-end">
                         <button type="button" onClick={() => switchView('reset')}
-                          className="text-[12px] text-emerald-600 hover:text-emerald-700 font-semibold transition-colors">
+                          className="text-[12px] text-blue-600 hover:text-blue-700 font-semibold transition-colors">
                           Forgot password?
                         </button>
                       </div>
@@ -259,11 +259,11 @@ export default function LoginPage() {
                       )}
 
                       <motion.button type="submit" disabled={loggingIn}
-                        whileHover={{ scale: 1.015, boxShadow: '0 8px 28px rgba(5,150,105,0.4)' }}
+                        whileHover={{ scale: 1.015, boxShadow: '0 8px 28px rgba(37,99,235,0.4)' }}
                         whileTap={{ scale: 0.985 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                        className="w-full py-3 mt-1 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white text-sm font-bold
-                                   rounded-xl shadow-lg shadow-emerald-200 transition-all disabled:opacity-60 cursor-pointer
+                        className="w-full py-3 mt-1 bg-gradient-to-r from-blue-500 to-blue-700 text-white text-sm font-bold
+                                   rounded-xl shadow-lg shadow-blue-200 transition-all disabled:opacity-60 cursor-pointer
                                    flex items-center justify-center gap-1.5">
                         {loggingIn ? 'Signing in…' : <>Sign In <ArrowRight size={15} /></>}
                       </motion.button>
@@ -278,7 +278,7 @@ export default function LoginPage() {
                     transition={{ duration: 0.25 }}
                   >
                     <div className="mb-7">
-                      <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200 mb-4 text-white">
+                      <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 mb-4 text-white">
                         <KeyRound size={20} strokeWidth={2} />
                       </div>
                       <h2 className="text-2xl font-black text-gray-800">Reset Password</h2>
@@ -296,7 +296,7 @@ export default function LoginPage() {
                             placeholder="you@example.com" required
                             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-700
                                        placeholder:text-gray-300 bg-gray-50/60
-                                       focus:outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all" />
+                                       focus:outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all" />
                         </div>
                       </div>
 
@@ -310,9 +310,9 @@ export default function LoginPage() {
                             placeholder="••••••••" required minLength={6}
                             className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl text-sm text-gray-700
                                        placeholder:text-gray-300 bg-gray-50/60
-                                       focus:outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all" />
+                                       focus:outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all" />
                           <button type="button" onClick={() => setShowNewPass(v => !v)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-500 transition-colors">
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500 transition-colors">
                             {showNewPass ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
                           </button>
                         </div>
@@ -328,9 +328,9 @@ export default function LoginPage() {
                             placeholder="••••••••" required minLength={6}
                             className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl text-sm text-gray-700
                                        placeholder:text-gray-300 bg-gray-50/60
-                                       focus:outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition-all" />
+                                       focus:outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all" />
                           <button type="button" onClick={() => setShowConfirm(v => !v)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-500 transition-colors">
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500 transition-colors">
                             {showConfirm ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
                           </button>
                         </div>
@@ -350,17 +350,17 @@ export default function LoginPage() {
                       )}
 
                       <motion.button type="submit" disabled={resetting}
-                        whileHover={{ scale: 1.015, boxShadow: '0 8px 28px rgba(5,150,105,0.4)' }}
+                        whileHover={{ scale: 1.015, boxShadow: '0 8px 28px rgba(37,99,235,0.4)' }}
                         whileTap={{ scale: 0.985 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                        className="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white text-sm font-bold
-                                   rounded-xl shadow-lg shadow-emerald-200 transition-all disabled:opacity-60 cursor-pointer
+                        className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-700 text-white text-sm font-bold
+                                   rounded-xl shadow-lg shadow-blue-200 transition-all disabled:opacity-60 cursor-pointer
                                    flex items-center justify-center gap-1.5">
                         {resetting ? 'Resetting…' : <>Reset Password <ArrowRight size={15} /></>}
                       </motion.button>
 
                       <button type="button" onClick={() => switchView('login')}
-                        className="w-full py-2 text-[12px] text-gray-400 hover:text-emerald-600 font-medium transition-colors flex items-center justify-center gap-1">
+                        className="w-full py-2 text-[12px] text-gray-400 hover:text-blue-600 font-medium transition-colors flex items-center justify-center gap-1">
                         <ArrowLeft size={14} strokeWidth={2} />
                         Back to Sign In
                       </button>

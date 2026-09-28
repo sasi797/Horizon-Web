@@ -15,11 +15,11 @@ import Tooltip from '@/components/Tooltip';
 
 const STATUS_BADGE: Record<string, string> = {
   pending_review: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
-  open: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400',
-  booked: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
-  confirmed: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+  open: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400',
+  booked: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
+  confirmed: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
   on_hold: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
-  exported: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300',
+  exported: 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300',
   cancelled: 'bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400',
   ignored: 'bg-gray-100 dark:bg-navy-800 text-gray-500 dark:text-navy-400',
 };
@@ -33,7 +33,7 @@ const STATUS_BADGE: Record<string, string> = {
 // are accepted, and anything else is dropped at ingest without a manifest.
 const EXTRACT_BADGE: Record<'loading' | 'completed' | 'failed' | 'ignored', string> = {
   loading: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400',
-  completed: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400',
+  completed: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400',
   failed: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
   ignored: 'bg-gray-100 dark:bg-navy-800 text-gray-500 dark:text-navy-400',
 };
@@ -71,7 +71,7 @@ const STATUS_LABEL: Record<string, string> = {
   ignored: 'Ignored',
 };
 
-type SortKey = 'reference_number' | 'status' | 'job_count' | 'indigo_job_number' | 'total_weight_kg' | 'created_by_name' | 'created_at';
+type SortKey = 'reference_number' | 'status' | 'job_count' | 'total_weight_kg' | 'created_by_name' | 'created_at';
 
 // Extract and HAWB Numbers have no single scalar to compare, so they're display-only columns.
 const TABLE_COLUMNS: { label: string; icon: typeof CaseSensitive; sortKey?: SortKey }[] = [
@@ -80,7 +80,6 @@ const TABLE_COLUMNS: { label: string; icon: typeof CaseSensitive; sortKey?: Sort
   { label: 'Extract', icon: FileSearch },
   { label: 'Remarks', icon: MessageSquare },
   { label: 'Jobs', icon: Hash, sortKey: 'job_count' },
-  { label: 'Indigo Job No', icon: Hash, sortKey: 'indigo_job_number' },
   { label: 'HAWB Numbers', icon: Hash },
   { label: 'Total Weight (kg)', icon: Hash, sortKey: 'total_weight_kg' },
   { label: 'Operator', icon: User, sortKey: 'created_by_name' },
@@ -174,7 +173,7 @@ function HawbNumbersCell({ hawbNumbers }: { hawbNumbers: string[] }) {
           onClick={(e) => { e.stopPropagation(); toggleOpen(); }}
           className={`shrink-0 text-[10.5px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap transition-colors ${
             open
-              ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400'
+              ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400'
               : 'bg-gray-50 dark:bg-navy-800/60 text-gray-400 dark:text-navy-500 hover:bg-gray-100 dark:hover:bg-navy-800'
           }`}
         >
@@ -236,7 +235,7 @@ function PageSizeSelect({ value, options, onChange }: { value: number; options: 
         onClick={() => setOpen(o => !o)}
         className={`inline-flex items-center gap-1.5 h-7 pl-2.5 pr-2 rounded-md border text-[11.5px] font-semibold transition-colors ${
           open
-            ? 'border-emerald-500/60 text-gray-900 dark:text-gray-100'
+            ? 'border-blue-500/60 text-gray-900 dark:text-gray-100'
             : 'border-gray-200 dark:border-navy-700 text-gray-700 dark:text-navy-200 hover:border-gray-300 dark:hover:border-navy-600'
         }`}
       >
@@ -262,7 +261,7 @@ function PageSizeSelect({ value, options, onChange }: { value: number; options: 
                   onClick={() => { onChange(n); setOpen(false); }}
                   className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[12px] transition-colors ${
                     isSelected
-                      ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold'
+                      ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 font-semibold'
                       : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-navy-700'
                   }`}
                 >
@@ -419,7 +418,7 @@ export default function ManifestsPage() {
     <motion.div variants={pageTransition} initial="hidden" animate="visible" className="space-y-4">
       <motion.div variants={staggerItem} className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2.5">
-          <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mt-0.5">
+          <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mt-0.5">
             <Package size={16} strokeWidth={2} />
           </span>
           <div>
@@ -447,7 +446,7 @@ export default function ManifestsPage() {
               onChange={(e) => { setSearch(e.target.value); setPage(0); }}
               placeholder="Search reference, HAWB, operator…"
               aria-label="Search manifests"
-              className="w-64 h-8 pl-8 pr-7 bg-transparent border-0 border-b border-gray-200 dark:border-navy-700 text-[12px] text-gray-700 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
+              className="w-64 h-8 pl-8 pr-7 bg-transparent border-0 border-b border-gray-200 dark:border-navy-700 text-[12px] text-gray-700 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-blue-500/60 transition-colors"
             />
             {search && (
               <button
@@ -572,13 +571,13 @@ export default function ManifestsPage() {
                     className={`group relative border-b border-gray-200 dark:border-navy-700 outline-none transition-colors duration-150 ${
                       isPending
                         ? ''
-                        : 'cursor-pointer hover:z-10 focus-visible:z-10 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/10 hover:shadow-[0_4px_16px_-4px_rgba(16,185,129,0.3)] dark:hover:shadow-[0_4px_16px_-4px_rgba(16,185,129,0.2)] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-emerald-400'
+                        : 'cursor-pointer hover:z-10 focus-visible:z-10 hover:bg-blue-50/40 dark:hover:bg-blue-950/10 hover:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.3)] dark:hover:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.2)] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400'
                     }`}
                   >
                     <td className="px-4 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap group-hover:rounded-l-lg">
                       <span className="inline-flex items-center gap-1.5">
-                        <File size={13} strokeWidth={1.8} className="text-gray-300 dark:text-navy-600 shrink-0 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors" />
-                        <span className="font-mono font-semibold text-gray-900 dark:text-gray-100 text-[12.5px] group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                        <File size={13} strokeWidth={1.8} className="text-gray-300 dark:text-navy-600 shrink-0 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
+                        <span className="font-mono font-semibold text-gray-900 dark:text-gray-100 text-[12.5px] group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                           {m.reference_number}
                         </span>
                         <PendingUpdateBadge count={pendingUpdateCounts.get(m.id) ?? 0} />
@@ -632,9 +631,6 @@ export default function ManifestsPage() {
                       )}
                     </td>
                     <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] font-medium text-gray-700 dark:text-navy-200">{isPending ? '—' : m.job_count}</td>
-                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] font-mono text-gray-700 dark:text-navy-200">
-                      {m.indigo_job_number ?? <span className="text-gray-300 dark:text-navy-600 font-sans">—</span>}
-                    </td>
                     <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 max-w-[280px]">
                       {isPending ? <span className="text-[12px] text-gray-400 dark:text-navy-500">—</span> : <HawbNumbersCell hawbNumbers={m.hawb_numbers} />}
                     </td>
@@ -648,7 +644,7 @@ export default function ManifestsPage() {
                       <span className="inline-flex items-center gap-1">
                         <span className="text-[11px] text-gray-500 dark:text-navy-400">{formatDateTime(m.created_at)}</span>
                         {!isPending && (
-                          <ChevronRight size={13} className="ml-1 text-gray-300 dark:text-navy-600 opacity-0 -translate-x-0.5 group-hover:opacity-100 group-hover:translate-x-0 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-all" />
+                          <ChevronRight size={13} className="ml-1 text-gray-300 dark:text-navy-600 opacity-0 -translate-x-0.5 group-hover:opacity-100 group-hover:translate-x-0 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-all" />
                         )}
                       </span>
                     </td>

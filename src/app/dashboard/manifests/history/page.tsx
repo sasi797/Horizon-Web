@@ -18,7 +18,7 @@ const REASON_LABEL: Record<string, string> = {
 
 const STATUS_BADGE: Record<string, string> = {
   pending: 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400',
-  applied: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400',
+  applied: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400',
   dismissed: 'bg-gray-100 dark:bg-navy-800 text-gray-500 dark:text-navy-400',
 };
 
@@ -70,7 +70,7 @@ export default function MergeHistoryPage() {
             </svg>
           </button>
           <div className="flex items-start gap-2.5">
-            <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mt-0.5">
+            <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mt-0.5">
               <History size={16} strokeWidth={2} />
             </span>
             <div>
@@ -90,7 +90,7 @@ export default function MergeHistoryPage() {
             onClick={() => setTab(t.key)}
             className={`text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors ${
               tab === t.key
-                ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400'
+                ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400'
                 : 'text-gray-400 dark:text-navy-500 hover:bg-gray-50 dark:hover:bg-navy-800'
             }`}
           >
@@ -157,7 +157,7 @@ export default function MergeHistoryPage() {
                         {manifestId ? (
                           <button
                             onClick={() => router.push(`/dashboard/manifests/${manifestId}`)}
-                            className="font-mono text-emerald-600 dark:text-emerald-400 hover:underline"
+                            className="font-mono text-blue-600 dark:text-blue-400 hover:underline"
                           >
                             {manifestRef ?? manifestId.slice(0, 8)}
                           </button>
@@ -177,7 +177,7 @@ export default function MergeHistoryPage() {
                             <button
                               onClick={() => applyJobUpdate(u.id)}
                               disabled={applying || dismissing}
-                              className="w-6 h-6 flex items-center justify-center rounded-md text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 disabled:opacity-40 transition-colors"
+                              className="w-6 h-6 flex items-center justify-center rounded-md text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-40 transition-colors"
                               title="Apply this update"
                             >
                               {applying && applyingId === u.id ? <RefreshCw size={12} className="animate-spin" /> : <Check size={13} />}

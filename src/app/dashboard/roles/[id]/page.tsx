@@ -19,7 +19,7 @@ function Field({ label, children }: { label: React.ReactNode; children: React.Re
   );
 }
 
-const inputClass = 'w-full h-9 px-3 bg-transparent border border-gray-200 dark:border-navy-700 rounded-lg text-[13px] text-gray-800 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-500/60 transition-colors';
+const inputClass = 'w-full h-9 px-3 bg-transparent border border-gray-200 dark:border-navy-700 rounded-lg text-[13px] text-gray-800 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-blue-500/60 transition-colors';
 
 function EditRolePageContent() {
   const { id } = useParams<{ id: string }>();
@@ -104,7 +104,7 @@ function EditRolePageContent() {
           <button
             type="submit"
             disabled={!canSubmit || isSaving}
-            className="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[12.5px] font-semibold transition-colors"
+            className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-[12.5px] font-semibold transition-colors"
           >
             {isSaving ? 'Saving…' : 'Save Changes'}
           </button>

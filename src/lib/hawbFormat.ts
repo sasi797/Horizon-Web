@@ -10,26 +10,87 @@ export function cityLine(value: string | null): string {
   return lines[lines.length - 1] ?? '—';
 }
 
+// Extractors write the country line in whichever form the source document used,
+// and constituent nations turn up as often as the union's own name.
+const UK_COUNTRY_NAMES = new Set([
+  'uk', 'gb', 'united kingdom', 'great britain', 'england', 'scotland', 'wales',
+  'northern ireland', 'united kingdom of great britain and northern ireland',
+]);
+
+// "UK" vs "United Kingdom" vs "GB" are the same fact written three ways —
+// collapse any of them to one token so an identity match isn't defeated by
+// which alias a given source document happened to use.
+function normalizeCountryToken(s: string): string {
+  const cleaned = s.toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+  return UK_COUNTRY_NAMES.has(cleaned) ? 'uk' : cleaned;
+}
+
+// Words that tell you a company's legal form or that it operates in the UK,
+// not which company it is — stripped off the end of a name (possibly several
+// at once, e.g. "... NHS Foundation Trust") so that they don't defeat a
+// same-company match just because one HAWB's extraction included the suffix
+// and another's didn't. Deliberately excludes anything that carries real
+// identifying meaning ("Hospital", "Laboratory", "Services", "Institute" —
+// two different real places can differ only by one of those).
+const TRAILING_NAME_BOILERPLATE = new Set([
+  ...UK_COUNTRY_NAMES,
+  'nhs foundation trust', 'nhs trust', 'foundation trust', 'trust', 'foundation', 'nhs',
+  'ltd', 'limited', 'plc', 'llc', 'inc', 'corp', 'corporation', 'co', 'company',
+]);
+const TRAILING_NAME_BOILERPLATE_BY_LENGTH = Array.from(TRAILING_NAME_BOILERPLATE).sort((a, b) => b.length - a.length);
+
+// Repeatedly strips a trailing boilerplate word/phrase off the end of an
+// already-lowercased/whitespace-collapsed name — "guy's and st thomas nhs
+// foundation trust" needs three rounds ("trust", then "foundation", then
+// "nhs") to reach the same "guy's and st thomas" another HAWB for the same
+// building might extract straight to.
+function stripTrailingBoilerplate(name: string): string {
+  let current = name;
+  for (let round = 0; round < 6; round++) {
+    const match = TRAILING_NAME_BOILERPLATE_BY_LENGTH.find(
+      token => current !== token && current.endsWith(` ${token}`),
+    );
+    if (!match) break;
+    current = current.slice(0, -(match.length + 1)).trim();
+  }
+  return current;
+}
+
 // Same-location identity for grouping HAWBs onto one driver leg — deliberately
 // coarser than an exact string match. Two HAWBs for the same company are often
 // OCR'd from different source documents, so the middle address lines (floor,
 // suite, minor whitespace/punctuation) can drift even when the company name and
-// city/country line — the two things a driver actually reads off the "From"/"To"
-// columns — are identical. Keys on just those two, normalized.
+// the site/city line — the two things a driver actually reads off the
+// "From"/"To" columns — are identical. Keys on just those two, normalized —
+// with punctuation, trailing legal-entity boilerplate ("... NHS Foundation
+// Trust" vs "... NHS Foundation" vs plain "..."), and country-alias quirks all
+// ironed out first, since none of that is a different place, just a different
+// way of writing the same one.
+//
+// The "site" signal is the tail after the final comma on the last line, not
+// the whole line — some source documents get extracted with every line after
+// the name comma-joined onto one ("Road, Centre, 10th Floor, North Wing, St
+// Thomas' Hospital") instead of split across lines like a well-formed address
+// ("Road" / "Centre" / "10th Floor, North Wing" / "St Thomas' Hospital"). In
+// both shapes the recognizable site name is whatever sits after the final
+// comma, so comparing on that instead of the raw last line matches the two
+// shapes the same way.
 export function addressIdentityKey(value: string | null): string | null {
   if (!value) return null;
-  const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').replace(/[.,]+$/, '').trim();
-  const name = normalize(splitAddress(value).name);
-  const last = normalize(cityLine(value));
+  const normalize = (s: string) => s.toLowerCase().replace(/['’]/g, '').replace(/\s+/g, ' ').replace(/[.,]+$/, '').trim();
+  const name = stripTrailingBoilerplate(normalize(splitAddress(value).name));
   if (!name || name === '—') return null;
+  const lastLine = cityLine(value);
+  const segments = lastLine.split(',');
+  const last = normalizeCountryToken(segments[segments.length - 1]);
   return `${name}|${last}`;
 }
 
 // A collection whose pickup site is the same place as the manifest's End
 // point isn't a real extra stop — the vehicle is already headed there as the
-// run's last stop, so the Indigo export skips booking it again as its own
-// AdditionalDrops entry (see Horizon-Api's indigo_export.is_backhaul_collection,
-// which this mirrors exactly).
+// run's last stop, so export skips booking it again as its own destination
+// (see Horizon-Api's mytransport_export.is_backhaul_collection, which this
+// mirrors exactly).
 export function isBackhaulCollection(
   job: { job_service_type: string | null; shipper: string | null },
   endPoint: string | null,
@@ -68,13 +129,6 @@ export function postcodeLine(value: string | null): string {
   return cityAndPostcodeLine(value).postcode;
 }
 
-// Extractors write the country line in whichever form the source document used,
-// and constituent nations turn up as often as the union's own name.
-const UK_COUNTRY_NAMES = new Set([
-  'uk', 'gb', 'united kingdom', 'great britain', 'england', 'scotland', 'wales',
-  'northern ireland', 'united kingdom of great britain and northern ireland',
-]);
-
 // Whether an address blob sits in the UK, read off its country line. Anything
 // unrecognized (including a blinded placeholder) counts as not-UK — callers use
 // this to pick a default, so an uncertain answer should decline rather than
@@ -95,30 +149,32 @@ export type AddressParts = { name: string; address: string; town: string; postco
 
 const EMPTY_ADDRESS_PARTS: AddressParts = { name: '', address: '', town: '', postcode: '', country: '' };
 
-// Shipper/consignee is stored as a single newline-separated blob (first line
-// company name, last line country). Splits it into editable parts by scanning
-// the lines between name and country for a postcode, same heuristic as
-// cityAndPostcodeLine — everything else in between becomes "address".
+// Shipper/consignee is stored as a single newline-separated blob: name, then
+// address lines, then an optional "Town, Postcode" line, then an optional
+// country line. The postcode is the only reliable anchor for where the
+// address ends — without one, there's no way to tell a real country line
+// from just another address line (e.g. a building/site name), so everything
+// after the name stays folded into "address" rather than guessing.
 export function parseAddressParts(value: string | null): AddressParts {
   if (!value) return EMPTY_ADDRESS_PARTS;
   const lines = value.split('\n').map(s => s.trim()).filter(Boolean);
   if (lines.length === 0) return EMPTY_ADDRESS_PARTS;
   const name = lines[0];
   if (lines.length === 1) return { ...EMPTY_ADDRESS_PARTS, name };
-  const country = lines[lines.length - 1];
-  const middle = lines.slice(1, lines.length - 1);
-  for (let i = middle.length - 1; i >= 0; i--) {
-    const line = middle[i];
+  const rest = lines.slice(1);
+  for (let i = rest.length - 1; i >= 0; i--) {
+    const line = rest[i];
     const match = line.match(UK_POSTCODE_RE) ?? line.match(EIRCODE_RE) ?? line.match(NUMERIC_POSTCODE_RE);
     if (match && match.index != null) {
       const postcode = match[0].toUpperCase();
       const before = line.slice(0, match.index).trim().replace(/,$/, '').trim();
       const town = before.split(',')[0].trim();
-      const address = [...middle.slice(0, i), ...middle.slice(i + 1)].join(', ');
+      const address = rest.slice(0, i).join(', ');
+      const country = rest.slice(i + 1).join(', ');
       return { name, address, town, postcode, country };
     }
   }
-  return { name, address: middle.join(', '), town: '', postcode: '', country };
+  return { name, address: rest.join(', '), town: '', postcode: '', country: '' };
 }
 
 // Inverse of parseAddressParts — rejoins edited parts back into the

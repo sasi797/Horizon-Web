@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Check, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Navigation, Flag, Ban, List, Combine, Weight, CalendarClock, Truck, Ungroup, Undo2 } from 'lucide-react';
+import { ChevronDown, Check, FileDown, TriangleAlert, FileText, ExternalLink, Clock, Thermometer, Package as PackageIcon, Banknote, Building2, MapPin, Phone, Hash, RefreshCw, Navigation, Flag, Ban, List, Combine, Weight, CalendarClock, Truck, Ungroup, Undo2, Route } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestQuery,
@@ -13,7 +13,7 @@ import {
   useCancelManifestMutation,
   useReopenManifestMutation,
   useRetryManifestExtractionMutation,
-  useIndigoExportManifestMutation,
+  useCarrierExportManifestMutation,
   useGetJobUpdatesQuery,
   useApplyJobUpdateMutation,
   type HawbJob,
@@ -27,11 +27,11 @@ import { useGetDropdownValuesQuery } from '@/services/dropdownApi';
 
 const MANIFEST_STATUS_BADGE: Record<string, string> = {
   pending_review: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
-  open: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400',
-  booked: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
-  confirmed: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+  open: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400',
+  booked: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
+  confirmed: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
   on_hold: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
-  exported: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300',
+  exported: 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300',
   cancelled: 'bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400',
   extracting: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400',
   failed: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
@@ -92,13 +92,13 @@ function pageRangeLabel(job: HawbJob): string | null {
   return count > 1 ? `Pages ${job.page_start}–${end}` : `Page ${job.page_start}`;
 }
 
-// Flags a Coll row whose pickup is the manifest's own End point — Indigo
-// export skips these (see is_backhaul_collection in Horizon-Api), so the tag
-// tells the reader this HAWB won't get its own AdditionalDrops entry.
+// Flags a Coll row whose pickup is the manifest's own End point — export
+// skips these (see is_backhaul_collection in Horizon-Api), so the tag tells
+// the reader this HAWB won't get its own destination entry.
 function BackhaulBadge() {
   return (
     <span
-      title="Coll matches the manifest's End point — Indigo export won't book this as its own additional drop"
+      title="Coll matches the manifest's End point — export won't book this as its own destination"
       className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-1 py-px rounded w-fit"
     >
       <Undo2 size={9} strokeWidth={2.25} /> Backhaul collection
@@ -223,7 +223,7 @@ function ManifestPlaceholderState({ manifest, onBack }: { manifest: HawbManifest
             type="button"
             onClick={() => retryExtraction(manifest.id)}
             disabled={retrying}
-            className="flex items-center gap-1.5 text-[11.5px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-60 pl-2 pr-3 py-1 rounded-md transition-colors"
+            className="flex items-center gap-1.5 text-[11.5px] font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-60 pl-2 pr-3 py-1 rounded-md transition-colors"
           >
             <RefreshCw size={11} strokeWidth={2.25} className={retrying ? 'animate-spin' : ''} />
             {retrying ? 'Retrying…' : 'Retry extraction'}
@@ -239,7 +239,7 @@ function ManifestPlaceholderState({ manifest, onBack }: { manifest: HawbManifest
 }
 
 const ROW1_ICON_TONE = 'text-gray-400 dark:text-navy-500';
-const ROW2_ICON_TONE = 'text-emerald-500 dark:text-emerald-400';
+const ROW2_ICON_TONE = 'text-gray-500 dark:text-navy-400';
 
 function PropLabel({
   icon: Icon, iconTone, children, required,
@@ -294,57 +294,107 @@ function isBlinded(value: string): boolean {
 }
 
 function AddressFields({
-  value, locked, onChange, onSave,
+  value, locked, onChange, onSave, layout = 'compact',
 }: {
   value: string;
   locked: boolean;
   onChange: (raw: string) => void;
   onSave: (raw: string) => void;
+  // 'compact' stacks every field in one column — right for the List tab's
+  // Shipper/Consignee panels, which already share a half-width 2-column grid.
+  // 'wide' pairs Company Name/Address on one row and Town/Postcode/Country on
+  // another — for a container with the full panel width to itself (the
+  // Destinations tab), where stacking everything just wastes the space.
+  layout?: 'compact' | 'wide';
 }) {
   const [parts, setParts] = useState<AddressParts>(() => parseAddressParts(value));
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
 
   const update = (patch: Partial<AddressParts>) => {
     const next = { ...parts, ...patch };
     setParts(next);
     onChange(buildAddress(next));
+    // A manual correction here is fixing an extraction gap — it shouldn't
+    // depend on the user remembering to click away to persist. Autosaves 2s
+    // after the last keystroke; onBlur below still flushes immediately for
+    // whoever does tab/click to the next field.
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => onSave(buildAddress(next)), 2000);
   };
 
-  const commit = () => onSave(buildAddress(parts));
+  const commit = () => {
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+    onSave(buildAddress(parts));
+  };
+
+  const nameField = (
+    <Field label="Company Name">
+      <input disabled={locked} value={parts.name}
+        onChange={e => update({ name: e.target.value })}
+        onBlur={commit}
+        className={inputClass(locked, isBlinded(parts.name))} />
+    </Field>
+  );
+  const addressField = (
+    <Field label="Address">
+      <textarea disabled={locked} value={parts.address} rows={2}
+        onChange={e => update({ address: e.target.value })}
+        onBlur={commit}
+        className={inputClass(locked, isBlinded(parts.address))} />
+    </Field>
+  );
+  const townField = (
+    <Field label="Town">
+      <input disabled={locked} value={parts.town}
+        onChange={e => update({ town: e.target.value })}
+        onBlur={commit}
+        className={inputClass(locked, isBlinded(parts.town))} />
+    </Field>
+  );
+  const postcodeField = (
+    <Field label="Postcode">
+      <input disabled={locked} value={parts.postcode}
+        onChange={e => update({ postcode: e.target.value })}
+        onBlur={commit}
+        className={inputClass(locked, isBlinded(parts.postcode))} />
+    </Field>
+  );
+  const countryField = (
+    <Field label="Country">
+      <input disabled={locked} value={parts.country}
+        onChange={e => update({ country: e.target.value })}
+        onBlur={commit}
+        className={inputClass(locked, isBlinded(parts.country))} />
+    </Field>
+  );
+
+  if (layout === 'wide') {
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          {nameField}
+          {addressField}
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {townField}
+          {postcodeField}
+          {countryField}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
-      <Field label="Company Name">
-        <input disabled={locked} value={parts.name}
-          onChange={e => update({ name: e.target.value })}
-          onBlur={commit}
-          className={inputClass(locked, isBlinded(parts.name))} />
-      </Field>
-      <Field label="Address">
-        <textarea disabled={locked} value={parts.address} rows={2}
-          onChange={e => update({ address: e.target.value })}
-          onBlur={commit}
-          className={inputClass(locked, isBlinded(parts.address))} />
-      </Field>
+      {nameField}
+      {addressField}
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Town">
-          <input disabled={locked} value={parts.town}
-            onChange={e => update({ town: e.target.value })}
-            onBlur={commit}
-            className={inputClass(locked, isBlinded(parts.town))} />
-        </Field>
-        <Field label="Postcode">
-          <input disabled={locked} value={parts.postcode}
-            onChange={e => update({ postcode: e.target.value })}
-            onBlur={commit}
-            className={inputClass(locked, isBlinded(parts.postcode))} />
-        </Field>
+        {townField}
+        {postcodeField}
       </div>
-      <Field label="Country">
-        <input disabled={locked} value={parts.country}
-          onChange={e => update({ country: e.target.value })}
-          onBlur={commit}
-          className={inputClass(locked, isBlinded(parts.country))} />
-      </Field>
+      {countryField}
     </div>
   );
 }
@@ -353,7 +403,7 @@ function inputClass(locked: boolean, invalid?: boolean) {
   const base = 'w-full text-[13px] border rounded-xl px-3 py-1.5 bg-gray-50/60 dark:bg-navy-800/60 text-black dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:bg-white dark:focus:bg-navy-800 focus:ring-2 transition-all';
   const state = invalid && !locked
     ? 'field-invalid border-red-400 dark:border-red-500 focus:border-red-400 dark:focus:border-red-500 focus:ring-red-100 dark:focus:ring-red-900/40'
-    : 'border-gray-200 dark:border-navy-700 focus:border-emerald-300 dark:focus:border-emerald-600 focus:ring-emerald-100 dark:focus:ring-emerald-900/40';
+    : 'border-gray-200 dark:border-navy-700 focus:border-gray-400 dark:focus:border-navy-500 focus:ring-gray-100 dark:focus:ring-navy-800/40';
   return `${base} ${state} ${locked ? 'opacity-60 cursor-not-allowed' : ''}`;
 }
 
@@ -437,7 +487,7 @@ function LocationSelect({
                     onClick={() => { onChange(o.value); setOpen(false); }}
                     className={`w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-[12.5px] transition-colors ${
                       isSelected
-                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold'
+                        ? 'bg-gray-100 dark:bg-navy-800 text-gray-900 dark:text-gray-100 font-semibold'
                         : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-navy-700'
                     }`}
                   >
@@ -492,7 +542,9 @@ function ServiceTypePicker({
             onClick={() => onChange(opt.value)}
             className={`px-1.5 py-1 rounded-md text-[10px] font-bold transition-colors whitespace-nowrap ${
               value === opt.value
-                ? 'bg-emerald-600 text-white shadow-sm'
+                ? opt.value === 'delivery'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-purple-500 text-white shadow-sm'
                 : 'text-gray-500 dark:text-navy-400 hover:bg-white dark:hover:bg-navy-700'
             } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
           >
@@ -502,6 +554,45 @@ function ServiceTypePicker({
       ))}
     </div>
   );
+}
+
+// One booking system's outcome (Indigo or EasyTrans/mytransport) — both fire
+// concurrently on Export and are tracked independently, so one can be booked
+// while the other is still failed/unattempted.
+function CarrierExportStatus({
+  label, status, reference, trackingUrl, error,
+}: {
+  label: string;
+  status: 'booked' | 'failed' | null;
+  reference?: string | null;
+  trackingUrl?: string | null;
+  error?: string | null;
+}) {
+  if (!status) return null;
+  const booked = status === 'booked';
+  const pill = (
+    <span
+      className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-md border ${
+        booked
+          ? 'text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-navy-800/50 border-gray-200 dark:border-navy-700'
+          : 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border-red-100 dark:border-red-900/50'
+      }`}
+    >
+      {booked ? <Check size={11} strokeWidth={2.5} className="shrink-0" /> : <TriangleAlert size={11} strokeWidth={2.25} className="shrink-0" />}
+      {label}: {booked ? `Booked${reference ? ` #${reference}` : ''}` : 'Failed'}
+    </span>
+  );
+  if (booked && trackingUrl) {
+    return (
+      <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
+        {pill}
+      </a>
+    );
+  }
+  if (!booked && error) {
+    return <Tooltip content={error} side="bottom">{pill}</Tooltip>;
+  }
+  return pill;
 }
 
 type JobForm = {
@@ -544,6 +635,160 @@ function formFromJob(job: HawbJob): JobForm {
   };
 }
 
+type DestinationStop = {
+  key: string;
+  kind: 'origin' | 'stop' | 'end';
+  collectDeliver: 0 | 1;
+  address: string;
+  hawbNumbers: string[];
+  incomplete?: boolean;
+  editTarget:
+    | { kind: 'manifest'; field: 'start_point' | 'end_point' }
+    | { kind: 'jobs'; field: 'shipper' | 'consignee'; jobIds: string[] };
+};
+
+// Preview of the exact stops mytransport.co.uk books on Export — mirrors
+// Horizon-Api's build_mytransport_order_payload in mytransport_export.py:
+// [Start point, one stop per merged run-order slot (skipping an all-backhaul
+// group, Coll → shipper address, Del → consignee address, then folding any
+// adjacent slots that resolve to the same physical address — see the
+// collapse loop below), End point]. The route always closes at its own End
+// point — whatever the dispatcher actually picked there, which is often but
+// not always the same address as Start point — regardless of whether a job
+// already supplied a real Delivery leg, unless skipEndDestination opts out.
+// Edits made here write straight to the same job/manifest fields Export
+// reads at send time, so there's no separate destinations record to keep in
+// sync — this just reads what's already there.
+function buildDestinationStops(
+  startPoint: string,
+  endPoint: string,
+  skipEndDestination: boolean,
+  mergeSlots: { key: string; jobs: HawbJob[] }[],
+): DestinationStop[] {
+  const stops: DestinationStop[] = [];
+
+  if (startPoint) {
+    stops.push({
+      key: 'start',
+      kind: 'origin',
+      collectDeliver: 0,
+      address: startPoint,
+      hawbNumbers: [],
+      editTarget: { kind: 'manifest', field: 'start_point' },
+    });
+  }
+
+  for (const slot of mergeSlots) {
+    const group = slot.jobs;
+    if (group.every(j => isBackhaulCollection(j, endPoint))) continue;
+    const job = group[0];
+    const hawbNumbers = group.map(j => j.hawb_number);
+    const jobIds = group.map(j => j.id);
+
+    if (job.job_service_type !== 'collection' && job.job_service_type !== 'delivery') {
+      stops.push({
+        key: slot.key,
+        kind: 'stop',
+        collectDeliver: 0,
+        address: '',
+        hawbNumbers,
+        incomplete: true,
+        editTarget: { kind: 'jobs', field: 'shipper', jobIds },
+      });
+      continue;
+    }
+
+    const isCollection = job.job_service_type === 'collection';
+    const field: 'shipper' | 'consignee' = isCollection ? 'shipper' : 'consignee';
+    const address = (isCollection ? job.shipper : job.consignee) ?? '';
+    const collectDeliver: 0 | 1 = isCollection ? 0 : 1;
+
+    // Two different run-order slots (no shared consignee/contact, so they
+    // weren't merged on the Merge tab) can still resolve to the exact same
+    // physical stop — e.g. two collections from the same building, anywhere
+    // in the run order, whose company name was OCR'd slightly differently
+    // per HAWB. Booking them as separate destinations would send the driver
+    // to the same building twice, so any earlier stop (not just the
+    // immediately preceding one) with the same leg and the same resolved
+    // address identity absorbs this one instead of a new stop being added —
+    // which is also what makes editing a destination's address to fix an
+    // extraction mismatch immediately fold it into its real match on the
+    // next render. Mirrors Horizon-Api's _collapse_same_stop_groups.
+    const identity = addressIdentityKey(address);
+    const match = identity !== null
+      ? stops.find(s =>
+        s.kind === 'stop' && !s.incomplete && s.collectDeliver === collectDeliver
+        && addressIdentityKey(s.address) === identity)
+      : undefined;
+    if (match) {
+      match.hawbNumbers = [...match.hawbNumbers, ...hawbNumbers];
+      if (match.editTarget.kind === 'jobs') {
+        match.editTarget = { kind: 'jobs', field: match.editTarget.field, jobIds: [...match.editTarget.jobIds, ...jobIds] };
+      }
+      continue;
+    }
+
+    stops.push({
+      key: slot.key,
+      kind: 'stop',
+      collectDeliver,
+      address,
+      hawbNumbers,
+      editTarget: { kind: 'jobs', field, jobIds },
+    });
+  }
+
+  if (!skipEndDestination) {
+    stops.push(endPoint ? {
+      key: 'end',
+      kind: 'end',
+      collectDeliver: 1,
+      address: endPoint,
+      hawbNumbers: [],
+      editTarget: { kind: 'manifest', field: 'end_point' },
+    } : {
+      key: 'end',
+      kind: 'end',
+      collectDeliver: 1,
+      address: '',
+      hawbNumbers: [],
+      incomplete: true,
+      editTarget: { kind: 'manifest', field: 'end_point' },
+    });
+  }
+
+  return stops;
+}
+
+// Groups stops for display only, by resolved address, anywhere in the run
+// order (not just adjacent ones) — a Delivery ending at a building and a
+// Collection starting from that same building (e.g. an inbound HAWB dropped
+// off, an outbound one picked up, at the same hospital) are one physical
+// visit for the driver even though mytransport's own destination model has
+// no combined type we've confirmed (`collect_deliver` is documented and
+// live-tested as strictly 0 or 1 — see mytransport-export-integration.md),
+// so the Export payload still sends them as separate destinations. This only
+// changes how they're numbered and cased together in the preview — which is
+// also what makes editing one destination's address to match another (an
+// extraction gave the same real building two slightly different company
+// names) immediately fold them together on the next render.
+function groupDestinationStops(stops: DestinationStop[]): DestinationStop[][] {
+  const groups: DestinationStop[][] = [];
+  const groupByIdentity = new Map<string, DestinationStop[]>();
+  for (const stop of stops) {
+    const identity = stop.kind === 'stop' && !stop.incomplete ? addressIdentityKey(stop.address) : null;
+    const existing = identity !== null ? groupByIdentity.get(identity) : undefined;
+    if (existing) {
+      existing.push(stop);
+      continue;
+    }
+    const group = [stop];
+    groups.push(group);
+    if (identity !== null) groupByIdentity.set(identity, group);
+  }
+  return groups;
+}
+
 export default function ManifestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -552,8 +797,7 @@ export default function ManifestDetailPage() {
   const [updateManifest] = useUpdateHawbManifestMutation();
   const [updateJob] = useUpdateHawbJobMutation();
   const [reorderJobs] = useReorderManifestJobsMutation();
-  const [indigoExportManifest] = useIndigoExportManifestMutation();
-  const [payloadBuilt, setPayloadBuilt] = useState(false);
+  const [carrierExportManifest] = useCarrierExportManifestMutation();
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [cancelManifest, { isLoading: cancelling }] = useCancelManifestMutation();
@@ -571,16 +815,23 @@ export default function ManifestDetailPage() {
   const [syncedJobs, setSyncedJobs] = useState<HawbJob[] | undefined>(undefined);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [runOrderView, setRunOrderView] = useState<'list' | 'merge'>('list');
+  const [runOrderView, setRunOrderView] = useState<'list' | 'merge' | 'destinations'>('list');
+  const [prevRunOrderView, setPrevRunOrderView] = useState(runOrderView);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedForMerge, setSelectedForMerge] = useState<Set<string>>(new Set());
+  const [selectedDestinationKey, setSelectedDestinationKey] = useState<string | null>(null);
   const [jobForm, setJobForm] = useState<JobForm | null>(null);
   const [syncedFormFor, setSyncedFormFor] = useState<string | null>(null);
   const [manifestFields, setManifestFields] = useState({
     start_point: '', end_point: '', job_reference: '', account_number: '', vehicle_size: '',
-    service_type: '',
+    service_type: '', skip_end_destination: false,
   });
   const [syncedPointsFor, setSyncedPointsFor] = useState<string | undefined>(undefined);
+  // Whether the Run order / Destinations preview should fall back to Start
+  // point for its End point stop when End point hasn't been explicitly
+  // chosen. UI-only (not persisted) — unchecking it means "leave End point
+  // unresolved until I pick one", it doesn't touch the End point field itself.
+  const [endMatchesStart, setEndMatchesStart] = useState(true);
 
   // Auto-apply pending blind-companion/duplicate merges as soon as they're seen —
   // no manual "Apply" click needed. Already-exported (locked) jobs are the one
@@ -602,16 +853,22 @@ export default function ManifestDetailPage() {
     }
   }, [autoApplyIds, applyJobUpdate]);
 
-  useEffect(() => {
-    if (manifest && manifest.jobs !== syncedJobs) {
-      setSyncedJobs(manifest.jobs);
-      setOrderedJobs(manifest.jobs);
-    }
-  }, [manifest, syncedJobs]);
+  // Adjusting state in response to a prop/state change, computed directly
+  // during render rather than in an effect — the React-recommended pattern
+  // for this ("You Might Not Need an Effect": adjusting state when a prop
+  // changes) since it re-renders immediately with the right value instead of
+  // committing one stale frame first. Guarded so each block only fires once
+  // per actual change, not on every render.
+  if (manifest && manifest.jobs !== syncedJobs) {
+    setSyncedJobs(manifest.jobs);
+    setOrderedJobs(manifest.jobs);
+  }
 
-  useEffect(() => {
+  if (runOrderView !== prevRunOrderView) {
+    setPrevRunOrderView(runOrderView);
     if (runOrderView !== 'merge') setSelectedForMerge(new Set());
-  }, [runOrderView]);
+    if (runOrderView !== 'destinations') setSelectedDestinationKey(null);
+  }
 
   // Fill in Del/Coll for any job the extractor left blank, from the route's UK
   // leg (see defaultServiceType). Only ever fills a blank — an extracted or
@@ -637,31 +894,28 @@ export default function ManifestDetailPage() {
     }
   }, [pendingServiceDefaults, manifestLocked, updateJob]);
 
-  useEffect(() => {
-    if (manifest && syncedPointsFor !== manifest.id) {
-      setSyncedPointsFor(manifest.id);
-      setManifestFields({
-        start_point: manifest.start_point ?? '',
-        end_point: manifest.end_point ?? '',
-        job_reference: manifest.job_reference ?? '',
-        account_number: manifest.account_number ?? '',
-        vehicle_size: manifest.vehicle_size ?? '',
-        service_type: manifest.service_type ?? '',
-      });
-    }
-  }, [manifest, syncedPointsFor]);
+  if (manifest && syncedPointsFor !== manifest.id) {
+    setSyncedPointsFor(manifest.id);
+    setManifestFields({
+      start_point: manifest.start_point ?? '',
+      end_point: manifest.end_point ?? '',
+      job_reference: manifest.job_reference ?? '',
+      account_number: manifest.account_number ?? '',
+      vehicle_size: manifest.vehicle_size ?? '',
+      service_type: manifest.service_type ?? '',
+      skip_end_destination: manifest.skip_end_destination,
+    });
+  }
 
   const selectedJob = orderedJobs.find(j => j.id === selectedJobId) ?? null;
 
-  useEffect(() => {
-    if (selectedJob && syncedFormFor !== selectedJob.id) {
-      setSyncedFormFor(selectedJob.id);
-      setJobForm(formFromJob(selectedJob));
-    } else if (!selectedJob && syncedFormFor !== null) {
-      setSyncedFormFor(null);
-      setJobForm(null);
-    }
-  }, [selectedJob, syncedFormFor]);
+  if (selectedJob && syncedFormFor !== selectedJob.id) {
+    setSyncedFormFor(selectedJob.id);
+    setJobForm(formFromJob(selectedJob));
+  } else if (!selectedJob && syncedFormFor !== null) {
+    setSyncedFormFor(null);
+    setJobForm(null);
+  }
 
   // Groups jobs into shared driver legs for the "Merge" run-order view. Two-tier
   // priority: (1) same delivery ("To") address — that's the repeated stop the
@@ -763,9 +1017,6 @@ export default function ManifestDetailPage() {
   const packageCount = orderedJobs.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
   const jobIdsWithUpdates = new Set(jobUpdates.map(u => u.job_id));
   const jobsMissingService = orderedJobs.filter(j => !j.job_service_type).length;
-  // The whole manifest books as one Indigo Job, so every HAWB on it carries the
-  // same JobNumber — the first one that has it is the manifest's number.
-  const indigoJobNumber = orderedJobs.find(j => j.indigo_job_number)?.indigo_job_number ?? null;
   // A parsed shipper/consignee field only blocks export if it still holds the
   // literal "Blinded Data" placeholder an extractor drops in for a redacted
   // blinded-trial address. Blank fields are allowed through — e.g. addresses
@@ -780,16 +1031,28 @@ export default function ManifestDetailPage() {
       || isBlinded(consignee.town) || isBlinded(consignee.postcode) || isBlinded(consignee.country);
   };
   const jobsWithIncompleteAddress = orderedJobs.filter(jobHasIncompleteAddress).length;
+  // Run order / backhaul detection fall back to Start point whenever End
+  // point hasn't been explicitly chosen — the route still closes the loop
+  // back at base for these purposes even though the End point dropdown
+  // itself stays blank until the dispatcher picks something. The dispatcher
+  // can turn this fallback off (endMatchesStart) when the route genuinely
+  // shouldn't close at Start point but End point isn't decided yet.
+  const effectiveEndPoint = manifestFields.end_point || (endMatchesStart ? manifestFields.start_point : '');
+  const destinationStops = buildDestinationStops(
+    manifestFields.start_point, effectiveEndPoint, manifestFields.skip_end_destination, mergeSlots,
+  );
+  const destinationGroups = groupDestinationStops(destinationStops);
   const missingExportFields = [
     !manifestFields.start_point && 'Start point',
-    !manifestFields.end_point && 'End point',
-    !manifestFields.job_reference && 'Job reference',
-    !manifestFields.account_number && 'Account number',
-    !manifestFields.vehicle_size && 'Vehicle size',
-    !manifestFields.service_type && 'Service type',
     jobsMissingService > 0 && `Del/Coll on ${jobsMissingService} job${jobsMissingService === 1 ? '' : 's'}`,
     jobsWithIncompleteAddress > 0 && `Shipper/Consignee details on ${jobsWithIncompleteAddress} job${jobsWithIncompleteAddress === 1 ? '' : 's'}`,
   ].filter((v): v is string => Boolean(v));
+  // Export books Indigo and EasyTrans independently — the button reappears
+  // (as a retry, not a fresh export) whenever the manifest already locked
+  // but one of the two still hasn't booked.
+  const canRetryExport = manifest.status === 'exported'
+    && (manifest.indigo_export_status !== 'booked' || manifest.mytransport_export_status !== 'booked');
+  const showExportButton = (manifest.status === 'open' && !locked) || canRetryExport;
 
   // Start/end point pickers offer the Configuration defaults (module 'manifest',
   // fields 'start_point'/'end_point') plus, per job, whichever address matches its
@@ -868,6 +1131,16 @@ export default function ManifestDetailPage() {
     }
   };
 
+  const toggleSkipEndDestination = async (checked: boolean) => {
+    if (locked) return;
+    setManifestFields(f => ({ ...f, skip_end_destination: checked }));
+    try {
+      await updateManifest({ id: manifest.id, body: { skip_end_destination: checked } }).unwrap();
+    } catch {
+      // reverts to server value on next refetch
+    }
+  };
+
   const saveJobField = async (jobId: string, field: string, value: unknown) => {
     if (locked) return;
     // updateHawbJob only invalidates the 'HawbJob' cache tag, not the manifest
@@ -881,6 +1154,14 @@ export default function ManifestDetailPage() {
       await updateJob({ id: jobId, body: { [field]: value } }).unwrap();
     } catch {
       // reverts to server value on next refetch
+    }
+  };
+
+  const saveDestinationAddress = (stop: DestinationStop, raw: string) => {
+    if (stop.editTarget.kind === 'manifest') {
+      saveManifestField(stop.editTarget.field, raw);
+    } else {
+      stop.editTarget.jobIds.forEach(jobId => saveJobField(jobId, stop.editTarget.field, raw || null));
     }
   };
 
@@ -901,31 +1182,16 @@ export default function ManifestDetailPage() {
   };
 
   const handleExport = async () => {
-    // Indigo's API has no CORS support, so a direct browser → Indigo call is
-    // blocked outright — the payload is built and the AddJob request is made
-    // server-side instead (see Horizon-Api's app/services/indigo_export.py),
-    // keeping the account credentials out of the frontend bundle entirely.
+    // Neither system's login can ship in the frontend bundle, so both
+    // payloads are built and posted server-side, concurrently, in one call
+    // (see Horizon-Api's app/routers/hawb.py: export_manifest_dual). If one
+    // system already booked on a prior attempt, this only retries the one
+    // that's still 'failed' — see manifest.indigo_export_status /
+    // manifest.mytransport_export_status below.
     setExporting(true);
     setExportError(null);
     try {
-      const { results } = await indigoExportManifest({
-        manifestId: manifest.id,
-        service_type: manifestFields.service_type,
-      }).unwrap();
-
-      // Per Indigo's doc, JobNumber is only populated "on success" — a
-      // rejection can come back with ErrorCode left null and only
-      // Errormessage set (seen live: "Invalid Customer Number"), so checking
-      // ErrorCode alone would have silently reported this as a success.
-      const failed = results.filter(r => !r.JobNumber);
-      if (failed.length > 0) {
-        setExportError(
-          `${failed.length} of ${results.length} job(s) were rejected by Indigo: ${failed.map(f => f.Errormessage || `error ${f.ErrorCode ?? 'unknown'}`).join('; ')}`
-        );
-      } else {
-        setPayloadBuilt(true);
-        setTimeout(() => setPayloadBuilt(false), 3000);
-      }
+      await carrierExportManifest({ manifestId: manifest.id }).unwrap();
     } catch (err) {
       const detail = (err as { data?: { detail?: string } })?.data?.detail;
       setExportError(detail ?? 'Export failed');
@@ -1000,7 +1266,7 @@ export default function ManifestDetailPage() {
               {cancelling ? 'Cancelling…' : 'Cancel manifest'}
             </button>
           )}
-          {manifest.status === 'open' && !locked && (
+          {showExportButton && (
             <Tooltip
               content={missingExportFields.length > 0 ? `Missing before export: ${missingExportFields.join(', ')}` : undefined}
               side="bottom"
@@ -1008,12 +1274,12 @@ export default function ManifestDetailPage() {
               <button
                 onClick={handleExport}
                 disabled={missingExportFields.length > 0 || exporting}
-                className="flex items-center gap-1.5 text-[11.5px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 disabled:opacity-60 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
+                className="flex items-center gap-1.5 text-[11.5px] font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
               >
-                <span className="flex items-center justify-center w-4 h-4 rounded bg-emerald-100 dark:bg-emerald-900/40">
+                <span className="flex items-center justify-center w-4 h-4 rounded bg-white/15 dark:bg-navy-900/10">
                   <FileDown size={11} strokeWidth={2.25} />
                 </span>
-                {exporting ? 'Exporting…' : payloadBuilt ? 'Exported ✓' : 'Export manifest'}
+                {exporting ? 'Exporting…' : canRetryExport ? 'Retry export' : 'Export manifest'}
               </button>
             </Tooltip>
           )}
@@ -1021,9 +1287,9 @@ export default function ManifestDetailPage() {
             <button
               onClick={handleReopen}
               disabled={reopening}
-              className="flex items-center gap-1.5 text-[11.5px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 disabled:opacity-60 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
+              className="flex items-center gap-1.5 text-[11.5px] font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 pl-2 pr-3 py-1 rounded-md transition-colors shrink-0"
             >
-              <span className="flex items-center justify-center w-4 h-4 rounded bg-emerald-100 dark:bg-emerald-900/40">
+              <span className="flex items-center justify-center w-4 h-4 rounded bg-white/15 dark:bg-navy-900/10">
                 <RefreshCw size={11} strokeWidth={2.25} />
               </span>
               {reopening ? 'Reopening…' : 'Reopen manifest'}
@@ -1042,6 +1308,24 @@ export default function ManifestDetailPage() {
         </motion.div>
       )}
 
+      {(manifest.indigo_export_status || manifest.mytransport_export_status) && (
+        <motion.div variants={staggerItem} className="flex flex-wrap items-center gap-2">
+          <CarrierExportStatus
+            label="Indigo"
+            status={manifest.indigo_export_status}
+            reference={manifest.indigo_job_number}
+            error={manifest.indigo_export_error}
+          />
+          <CarrierExportStatus
+            label="EasyTrans"
+            status={manifest.mytransport_export_status}
+            reference={manifest.mytransport_order_no}
+            trackingUrl={manifest.mytransport_tracking_url}
+            error={manifest.mytransport_export_error}
+          />
+        </motion.div>
+      )}
+
       <ConfirmDialog
         open={showCancelConfirm}
         title="Cancel this manifest?"
@@ -1055,7 +1339,7 @@ export default function ManifestDetailPage() {
       />
 
       <motion.div variants={staggerItem} className="bg-white dark:bg-navy-900 rounded-2xl border border-gray-100 dark:border-navy-800 shadow-sm p-3.5">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-x-3.5 gap-y-2.5 pb-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-3.5 gap-y-2.5 pb-3">
           <div className="min-w-0 rounded-md px-2 py-1.5 -mx-2">
             <PropLabel icon={PackageIcon} iconTone={ROW1_ICON_TONE}>Packages</PropLabel>
             <p className="text-[12.5px] font-medium text-gray-800 dark:text-gray-100 truncate">{packageCount}</p>
@@ -1067,12 +1351,6 @@ export default function ManifestDetailPage() {
           <div className="min-w-0 rounded-md px-2 py-1.5 -mx-2">
             <PropLabel icon={TriangleAlert} iconTone={ROW1_ICON_TONE}>Dangerous goods</PropLabel>
             <p className={`text-[12.5px] font-semibold truncate ${dgCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-gray-100'}`}>{dgCount}</p>
-          </div>
-          <div className="min-w-0 rounded-md px-2 py-1.5 -mx-2">
-            <PropLabel icon={Hash} iconTone={ROW1_ICON_TONE}>Indigo job</PropLabel>
-            <p className="text-[12.5px] font-medium font-mono text-gray-800 dark:text-gray-100 truncate">
-              {indigoJobNumber ?? '—'}
-            </p>
           </div>
           <div className="min-w-0 rounded-md px-2 py-1.5 -mx-2">
             <PropLabel icon={CalendarClock} iconTone={ROW1_ICON_TONE}>Uploaded</PropLabel>
@@ -1096,7 +1374,7 @@ export default function ManifestDetailPage() {
               className="min-w-0 w-full text-left rounded-md px-2 py-1.5 -mx-2 hover:bg-gray-50 dark:hover:bg-navy-800/60 transition-colors"
             >
               <PropLabel icon={FileText} iconTone={ROW1_ICON_TONE}>Document</PropLabel>
-              <p className="flex items-center gap-1 text-[12.5px] font-medium text-emerald-600 dark:text-emerald-400 truncate">
+              <p className="flex items-center gap-1 text-[12.5px] font-medium text-blue-600 dark:text-blue-400 truncate">
                 View PDF
                 <ExternalLink size={10} strokeWidth={2.5} className="shrink-0" />
               </p>
@@ -1130,6 +1408,32 @@ export default function ManifestDetailPage() {
                 saveManifestField('end_point', value);
               }}
             />
+            <Tooltip content="Export always books End point as the route's final destination — check this for a manifest that genuinely has nowhere to close the loop" side="bottom">
+              <label className={`flex items-center gap-1.5 mt-1.5 -mx-2 px-2 py-1 rounded-md text-[10.5px] font-medium text-gray-500 dark:text-navy-400 ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-navy-800/60'}`}>
+                <input
+                  type="checkbox"
+                  disabled={locked}
+                  checked={manifestFields.skip_end_destination}
+                  onChange={e => toggleSkipEndDestination(e.target.checked)}
+                  className="rounded cursor-pointer accent-gray-700 dark:accent-navy-300"
+                />
+                Don&apos;t add End point as a destination
+              </label>
+            </Tooltip>
+            {!manifestFields.end_point && !manifestFields.skip_end_destination && (
+              <Tooltip content="Uncheck this if the route shouldn't default to closing back at Start point — the run order will flag End point as unresolved until you pick one" side="bottom">
+                <label className={`flex items-center gap-1.5 mt-1 -mx-2 px-2 py-1 rounded-md text-[10.5px] font-medium text-gray-500 dark:text-navy-400 ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-navy-800/60'}`}>
+                  <input
+                    type="checkbox"
+                    disabled={locked}
+                    checked={endMatchesStart}
+                    onChange={e => setEndMatchesStart(e.target.checked)}
+                    className="rounded cursor-pointer accent-gray-700 dark:accent-navy-300"
+                  />
+                  Default End point to Start point
+                </label>
+              </Tooltip>
+            )}
           </div>
           <div className="min-w-0">
             <PropLabel icon={Banknote} iconTone={ROW2_ICON_TONE} required>Account number</PropLabel>
@@ -1182,7 +1486,7 @@ export default function ManifestDetailPage() {
               placeholder="Empty"
               onChange={e => setManifestFields(f => ({ ...f, job_reference: e.target.value }))}
               onBlur={e => saveManifestField('job_reference', e.target.value)}
-              className={`w-full text-[12.5px] font-medium text-gray-800 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-navy-600 placeholder:font-normal bg-transparent border-none rounded-md px-2 py-1.5 -mx-2 hover:bg-gray-50 dark:hover:bg-navy-800/60 focus:bg-gray-50 dark:focus:bg-navy-800/60 focus:outline-none focus:ring-1 focus:ring-emerald-300 dark:focus:ring-emerald-700 transition-colors ${locked ? 'opacity-60 cursor-not-allowed' : ''}`}
+              className={`w-full text-[12.5px] font-medium text-gray-800 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-navy-600 placeholder:font-normal bg-transparent border-none rounded-md px-2 py-1.5 -mx-2 hover:bg-gray-50 dark:hover:bg-navy-800/60 focus:bg-gray-50 dark:focus:bg-navy-800/60 focus:outline-none focus:ring-1 focus:ring-gray-300 dark:focus:ring-navy-600 transition-colors ${locked ? 'opacity-60 cursor-not-allowed' : ''}`}
             />
           </div>
         </div>
@@ -1197,9 +1501,11 @@ export default function ManifestDetailPage() {
                 ? 'Manifest is exported and locked'
                 : runOrderView === 'merge'
                   ? 'Drag to reorder stops — click a group to expand it'
-                  : routeGroups.size === 0
-                    ? 'Drag to reorder — click a row to expand its details'
-                    : 'Click a row to expand its details'}
+                  : runOrderView === 'destinations'
+                    ? 'Preview of the stops sent to mytransport on Export — edit an address to fix it before exporting'
+                    : routeGroups.size === 0
+                      ? 'Drag to reorder — click a row to expand its details'
+                      : 'Click a row to expand its details'}
             </p>
           </div>
           <div className="inline-flex items-center rounded-lg border border-gray-200 dark:border-navy-700 bg-gray-50/70 dark:bg-navy-800/60 p-0.5 gap-0.5 shrink-0">
@@ -1209,7 +1515,7 @@ export default function ManifestDetailPage() {
                 onClick={() => setRunOrderView('list')}
                 className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-bold transition-colors ${
                   runOrderView === 'list'
-                    ? 'bg-emerald-600 text-white shadow-sm'
+                    ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-gray-500 dark:text-navy-400 hover:bg-white dark:hover:bg-navy-700'
                 }`}
               >
@@ -1223,7 +1529,7 @@ export default function ManifestDetailPage() {
                 onClick={() => setRunOrderView('merge')}
                 className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-bold transition-colors ${
                   runOrderView === 'merge'
-                    ? 'bg-emerald-600 text-white shadow-sm'
+                    ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-gray-500 dark:text-navy-400 hover:bg-white dark:hover:bg-navy-700'
                 }`}
               >
@@ -1231,12 +1537,26 @@ export default function ManifestDetailPage() {
                 Merge
               </button>
             </Tooltip>
+            <Tooltip content="Preview the stops sent to mytransport on Export, with edits" side="bottom">
+              <button
+                type="button"
+                onClick={() => setRunOrderView('destinations')}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-bold transition-colors ${
+                  runOrderView === 'destinations'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-500 dark:text-navy-400 hover:bg-white dark:hover:bg-navy-700'
+                }`}
+              >
+                <Route size={12} strokeWidth={2.25} />
+                Destinations
+              </button>
+            </Tooltip>
           </div>
         </div>
 
         {runOrderView === 'merge' && selectedForMerge.size > 0 && (
-          <div className="flex items-center justify-between px-4 py-2 bg-emerald-50 dark:bg-emerald-950/20 border-b border-emerald-100 dark:border-emerald-900/40">
-            <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+          <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-navy-800/30 border-b border-gray-200 dark:border-navy-800">
+            <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">
               {selectedForMerge.size} HAWB{selectedForMerge.size === 1 ? '' : 's'} selected
             </span>
             <div className="flex items-center gap-2">
@@ -1251,7 +1571,7 @@ export default function ManifestDetailPage() {
                 type="button"
                 disabled={selectedForMerge.size < 2 || locked}
                 onClick={handleMergeSelected}
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-bold bg-emerald-600 text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-emerald-700"
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-bold bg-blue-600 text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700"
               >
                 <Combine size={12} strokeWidth={2.25} />
                 Merge {selectedForMerge.size} selected
@@ -1260,9 +1580,158 @@ export default function ManifestDetailPage() {
           </div>
         )}
 
+        {runOrderView === 'destinations' ? (
+          <div>
+            {destinationGroups.length === 0 ? (
+              <p className="py-8 text-[12px] text-gray-400 dark:text-navy-500 text-center">
+                Set a Start point and Del/Coll on at least one job to see destinations.
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-[36px_140px_minmax(220px,1.3fr)_110px_minmax(140px,1fr)] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
+                  <span>#</span>
+                  <span>Type</span>
+                  <span>Company</span>
+                  <span>Postcode</span>
+                  <span>HAWBs</span>
+                </div>
+                <div className="divide-y divide-gray-50 dark:divide-navy-800/70">
+                  {destinationGroups.map((group, i) => {
+                    const first = group[0];
+                    const isOrigin = first.kind === 'origin';
+                    const isEnd = first.kind === 'end';
+                    const legsPresent = Array.from(new Set(group.map(s => s.collectDeliver)));
+                    const hawbNumbers = group.flatMap(s => s.hawbNumbers);
+                    const groupKey = group.map(s => s.key).join('+');
+                    const representative = group.find(s => !s.incomplete);
+                    const selected = selectedDestinationKey === groupKey;
+                    const companyName = representative ? splitAddress(representative.address).name : null;
+                    const postcode = representative ? cityAndPostcodeLine(representative.address).postcode : '';
+
+                    return (
+                      <div key={groupKey}>
+                        <div
+                          onClick={() => setSelectedDestinationKey(cur => (cur === groupKey ? null : groupKey))}
+                          className={`grid grid-cols-[36px_140px_minmax(220px,1.3fr)_110px_minmax(140px,1fr)] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
+                            selected ? 'bg-gray-100/70 dark:bg-navy-800/40' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1 text-gray-900 dark:text-gray-100 font-mono">
+                            <ChevronDown size={11} className={`text-gray-300 dark:text-navy-600 shrink-0 transition-transform ${selected ? 'rotate-0' : '-rotate-90'}`} />
+                            {i + 1}
+                          </span>
+                          <span className="flex items-center gap-1 flex-wrap min-w-0">
+                            {isOrigin || isEnd ? (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-navy-800 text-gray-500 dark:text-navy-400">
+                                {isOrigin ? 'Start point' : 'End point'}
+                              </span>
+                            ) : (
+                              legsPresent.map(leg => (
+                                <span
+                                  key={leg}
+                                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                    leg === 0
+                                      ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400'
+                                      : 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400'
+                                  }`}
+                                >
+                                  {leg === 0 ? 'Pick-up' : 'Delivery'}
+                                </span>
+                              ))
+                            )}
+                          </span>
+                          {companyName ? (
+                            <span className="text-gray-900 dark:text-gray-100 truncate">{companyName}</span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 truncate">
+                              <TriangleAlert size={11} strokeWidth={2.25} className="shrink-0" />
+                              {isEnd ? 'Set End point to resolve address' : 'Set Del/Coll to resolve address'}
+                            </span>
+                          )}
+                          <span className="text-gray-900 dark:text-gray-100 tabular-nums">{postcode || '—'}</span>
+                          <span className="font-mono text-[11px] font-bold text-gray-500 dark:text-navy-400 truncate">
+                            {hawbNumbers.length > 0 ? hawbNumbers.join(', ') : '—'}
+                          </span>
+                        </div>
+
+                        <AnimatePresence initial={false}>
+                          {selected && (representative || first.incomplete) && (
+                            <motion.div
+                              key="expanded"
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2, ease: 'easeOut' }}
+                              className="overflow-hidden bg-gray-50/40 dark:bg-navy-950/20 border-t border-gray-100 dark:border-navy-800"
+                            >
+                              <div className="px-4 py-4 max-w-3xl">
+                                {representative ? (
+                                  <AddressFields
+                                    key={groupKey}
+                                    value={representative.address}
+                                    locked={locked}
+                                    onChange={() => {}}
+                                    onSave={raw => group.forEach(stop => saveDestinationAddress(stop, raw))}
+                                    layout="wide"
+                                  />
+                                ) : first.editTarget.kind === 'manifest' ? (
+                                  <div className="max-w-xs">
+                                    <p className="text-[11.5px] text-gray-500 dark:text-navy-400 mb-1.5">
+                                      Pick {first.editTarget.field === 'start_point' ? 'Start' : 'End'} point to resolve this stop:
+                                    </p>
+                                    <LocationSelect
+                                      disabled={locked}
+                                      value={manifestFields[first.editTarget.field]}
+                                      emptyLabel="Empty"
+                                      options={withCurrentValue(
+                                        first.editTarget.field === 'start_point' ? startOptions : endOptions,
+                                        manifestFields[first.editTarget.field],
+                                      )}
+                                      onChange={value => {
+                                        const field = first.editTarget.field as 'start_point' | 'end_point';
+                                        setManifestFields(f => ({ ...f, [field]: value }));
+                                        saveManifestField(field, value);
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <p className="text-[11.5px] text-gray-500 dark:text-navy-400">
+                                      Set Collection or Delivery to resolve {group.length > 1 ? 'these HAWBs’' : 'this HAWB’s'} address:
+                                    </p>
+                                    {first.editTarget.jobIds.map(jobId => {
+                                      const job = orderedJobs.find(j => j.id === jobId);
+                                      if (!job) return null;
+                                      return (
+                                        <div key={jobId} className="flex items-center gap-2">
+                                          <span className="font-mono text-[11px] font-bold text-gray-500 dark:text-navy-400">
+                                            {job.hawb_number}
+                                          </span>
+                                          <ServiceTypePicker
+                                            value={job.job_service_type ?? ''}
+                                            disabled={locked}
+                                            onChange={value => updateServiceType(jobId, value)}
+                                          />
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
         <div className="overflow-x-auto">
-        <div className="min-w-[1630px]">
-        <div className="grid grid-cols-[36px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_110px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
+        <div className="min-w-[1512px]">
+        <div className="grid grid-cols-[36px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px] gap-2 px-4 py-2 text-[11px] font-bold text-gray-400 dark:text-navy-500 uppercase tracking-wide border-b border-gray-100 dark:border-navy-800">
           <div className="col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[358px] bg-white dark:bg-navy-900 grid grid-cols-[36px_190px_100px] gap-2">
             <span>#</span>
             <span>HAWB</span>
@@ -1276,14 +1745,13 @@ export default function ManifestDetailPage() {
           <span>Del.</span>
           <span>Pkg</span>
           <span>Wt (kg)</span>
-          <span>Indigo Job#</span>
         </div>
 
         <div className="divide-y divide-gray-50 dark:divide-navy-800/70">
           {(() => { let mergeRowCounter = 0; return orderedJobs.map(job => {
             const selected = selectedJobId === job.id;
             const pages = pageRangeLabel(job);
-            const backhaul = isBackhaulCollection(job, manifestFields.end_point);
+            const backhaul = isBackhaulCollection(job, effectiveEndPoint);
             const jobMultiPackage = job.packages.length > 1;
             const jobPackagesHaveDetail = job.packages.some(p => p.temperature_range || p.dimensions);
             const jobShowCombinedTempDims = !jobMultiPackage || !jobPackagesHaveDetail;
@@ -1326,7 +1794,7 @@ export default function ManifestDetailPage() {
               // Export only skips this whole merged stop when every member is a
               // backhaul collection — a mix still books normally, so the
               // collapsed summary only flags the all-backhaul case.
-              const groupBackhaul = routeGroup.every(j => isBackhaulCollection(j, manifestFields.end_point));
+              const groupBackhaul = routeGroup.every(j => isBackhaulCollection(j, effectiveEndPoint));
               return (
                 <div key={groupKey}>
                   <div
@@ -1335,7 +1803,7 @@ export default function ManifestDetailPage() {
                     onDragOver={reorderable ? (e: React.DragEvent) => { e.preventDefault(); handleSlotDragOver(slotIndex); } : undefined}
                     onDrop={reorderable ? handleDrop : undefined}
                     onClick={() => setExpandedGroups(prev => new Set(prev).add(groupKey))}
-                    className={`grid grid-cols-[36px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_110px] gap-2 items-center px-4 py-2.5 text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25 ${reorderable ? 'cursor-move' : 'cursor-pointer'}`}
+                    className={`grid grid-cols-[36px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px] gap-2 items-center px-4 py-2.5 text-[12px] transition-colors bg-blue-50/40 dark:bg-blue-950/15 hover:bg-blue-50/70 dark:hover:bg-blue-950/25 ${reorderable ? 'cursor-move' : 'cursor-pointer'}`}
                   >
                     <div className="col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[358px] bg-blue-50 dark:bg-blue-950/90 grid grid-cols-[36px_190px_100px] gap-2 items-center">
                       <span className="text-gray-900 dark:text-gray-100 font-mono">{rowNumber}</span>
@@ -1372,14 +1840,14 @@ export default function ManifestDetailPage() {
                       </div>
                     </div>
                     <span className="inline-flex items-center gap-0.5 min-w-0 pl-2">
-                      <MapPin size={9} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
+                      <MapPin size={9} className="text-gray-400 dark:text-navy-500 shrink-0" />
                       <span className="text-gray-900 dark:text-gray-100 truncate">
                         {[splitAddress(job.shipper).name, cityLine(job.shipper)].filter(Boolean).join(' · ') || '—'}
                       </span>
                     </span>
                     <span className="text-gray-900 dark:text-gray-100 truncate">{cityAndPostcodeLine(job.shipper).postcode || '—'}</span>
                     <span className="inline-flex items-center gap-0.5 min-w-0">
-                      <Building2 size={9} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
+                      <Building2 size={9} className="text-gray-400 dark:text-navy-500 shrink-0" />
                       <span className="text-gray-900 dark:text-gray-100 truncate">
                         {[splitAddress(job.consignee).name, cityLine(job.consignee)].filter(Boolean).join(' · ') || '—'}
                       </span>
@@ -1389,7 +1857,6 @@ export default function ManifestDetailPage() {
                     <span className="text-gray-900 dark:text-gray-100 tabular-nums">{commonValue(delTimes)}</span>
                     <span className="text-gray-900 dark:text-gray-100 tabular-nums">{totalPkg}</span>
                     <span className="text-gray-900 dark:text-gray-100 tabular-nums">{totalWt}</span>
-                    <span className="text-gray-900 dark:text-gray-100 font-mono truncate">{commonValue(routeGroup.map(j => j.indigo_job_number ?? '—'))}</span>
                   </div>
                 </div>
               );
@@ -1408,7 +1875,7 @@ export default function ManifestDetailPage() {
             // the table scrolls horizontally, so they can't reuse the row's
             // own translucent state colors.
             const stickyBg = selected
-              ? 'bg-emerald-50 dark:bg-emerald-950/90'
+              ? 'bg-gray-100 dark:bg-navy-800'
               : isGroupParent
                 ? 'bg-blue-50 dark:bg-blue-950/90'
                 : 'bg-white dark:bg-navy-900';
@@ -1431,10 +1898,10 @@ export default function ManifestDetailPage() {
                 )}
                 <div
                   {...dragProps}
-                  className={`grid grid-cols-[36px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px_110px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
+                  className={`grid grid-cols-[36px_190px_100px_minmax(240px,1.3fr)_100px_minmax(240px,1.3fr)_100px_140px_140px_60px_70px] gap-2 items-center px-4 py-2.5 cursor-pointer text-[12px] transition-colors ${
                     isGroupParent ? 'bg-blue-50/25 dark:bg-blue-950/10' : ''
                   } ${
-                    selected ? 'bg-emerald-50/70 dark:bg-emerald-950/25' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
+                    selected ? 'bg-gray-100/70 dark:bg-navy-800/40' : 'hover:bg-gray-50/70 dark:hover:bg-navy-800/50'
                   }`}
                 >
                   <div className={`col-span-3 sticky left-0 z-10 -ml-4 pl-4 w-[358px] ${stickyBg} grid grid-cols-[36px_190px_100px] gap-2 items-center`}>
@@ -1449,7 +1916,7 @@ export default function ManifestDetailPage() {
                             if (next.has(job.id)) next.delete(job.id); else next.add(job.id);
                             return next;
                           })}
-                          className="w-3 h-3 rounded cursor-pointer accent-emerald-600 shrink-0"
+                          className="w-3 h-3 rounded cursor-pointer accent-gray-700 dark:accent-navy-300 shrink-0"
                         />
                       )}
                       <span className="text-gray-900 dark:text-gray-100 font-mono">{isGroupParent && groupExpanded ? '' : rowNumber}</span>
@@ -1457,8 +1924,8 @@ export default function ManifestDetailPage() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <ChevronDown size={11} className={`text-gray-300 dark:text-navy-600 shrink-0 transition-transform ${selected ? 'rotate-0' : '-rotate-90'}`} />
-                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 truncate min-w-0">{job.hawb_number}</span>
-                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-500 dark:text-blue-400 shrink-0">
+                        <span className="font-mono font-bold text-gray-900 dark:text-gray-100 truncate min-w-0">{job.hawb_number}</span>
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-gray-400 dark:text-navy-500 shrink-0">
                           <FileText size={10} />{pages ?? 'Page 1'}
                         </span>
                         {job.dangerous_goods_notes && <TriangleAlert size={10} className="text-red-500 shrink-0" />}
@@ -1490,14 +1957,14 @@ export default function ManifestDetailPage() {
                     </div>
                   </div>
                   <span className="inline-flex items-center gap-0.5 min-w-0 pl-2">
-                    <MapPin size={9} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
+                    <MapPin size={9} className="text-gray-400 dark:text-navy-500 shrink-0" />
                     <span className="text-gray-900 dark:text-gray-100 truncate">
                       {[splitAddress(job.shipper).name, cityLine(job.shipper)].filter(Boolean).join(' · ') || '—'}
                     </span>
                   </span>
                   <span className="text-gray-900 dark:text-gray-100 truncate">{cityAndPostcodeLine(job.shipper).postcode || '—'}</span>
                   <span className="inline-flex items-center gap-0.5 min-w-0">
-                    <Building2 size={9} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
+                    <Building2 size={9} className="text-gray-400 dark:text-navy-500 shrink-0" />
                     <span className="text-gray-900 dark:text-gray-100 truncate">
                       {[splitAddress(job.consignee).name, cityLine(job.consignee)].filter(Boolean).join(' · ') || '—'}
                     </span>
@@ -1507,7 +1974,6 @@ export default function ManifestDetailPage() {
                   <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.delivery_at ? formatTime(job.delivery_at) : '—'}</span>
                   <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.package_qty ?? '—'}</span>
                   <span className="text-gray-900 dark:text-gray-100 tabular-nums">{job.weight_kg ?? '—'}</span>
-                  <span className="text-gray-900 dark:text-gray-100 font-mono truncate">{job.indigo_job_number ?? '—'}</span>
                 </div>
 
                 <AnimatePresence initial={false}>
@@ -1521,15 +1987,8 @@ export default function ManifestDetailPage() {
                       className="overflow-hidden bg-gray-50/40 dark:bg-navy-950/20 border-t border-gray-100 dark:border-navy-800"
                     >
                       <div className="px-4 py-4 space-y-6 max-w-4xl">
-                        {(job.blind_pdf_url || job.indigo_job_number) && (
+                        {job.blind_pdf_url && (
                           <div className="flex items-center justify-end gap-2">
-                            {job.indigo_job_number && (
-                              <Tooltip content="Indigo's own reference for this job, returned from AddJob" side="bottom">
-                                <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full">
-                                  <Hash size={11} /> Indigo Job {job.indigo_job_number}
-                                </span>
-                              </Tooltip>
-                            )}
                             {job.blind_pdf_url && (
                               <Tooltip content="View the companion MF-PCS PDF used to fill in redacted fields" side="bottom">
                                 <button
@@ -1838,6 +2297,7 @@ export default function ManifestDetailPage() {
         </div>
         </div>
         </div>
+        )}
 
       </motion.div>
     </motion.div>

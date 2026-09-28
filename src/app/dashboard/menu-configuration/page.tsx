@@ -23,9 +23,9 @@ const BASE_MODULES = [
   { key: 'user', label: 'User', icon: UserRound },
 ];
 
-const inputClass = 'w-full h-8 px-2.5 bg-transparent border border-gray-200 dark:border-navy-700 rounded-lg text-[12.5px] text-gray-800 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-500/60 transition-colors';
+const inputClass = 'w-full h-8 px-2.5 bg-transparent border border-gray-200 dark:border-navy-700 rounded-lg text-[12.5px] text-gray-800 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-blue-500/60 transition-colors';
 
-// The Indigo export payload builder (Horizon-Api's indigo_export.py) parses
+// The export payload builder (Horizon-Api's mytransport_export.py) parses
 // start_point/end_point the same way it parses a HAWB shipper/consignee
 // address: first line = name, middle line = street address, second-to-last
 // line = "Town, Postcode", last line = Country. Rather than have someone type
@@ -154,7 +154,7 @@ function MenuConfigurationPageContent() {
         </div>
         <Link
           href={`/dashboard/menu-configuration/new?module=${activeModule}`}
-          className="group inline-flex items-center gap-2 h-8 pl-2 pr-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-[12px] font-semibold shadow-sm shadow-emerald-600/20 transition-colors no-underline shrink-0"
+          className="group inline-flex items-center gap-2 h-8 pl-2 pr-3 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-[12px] font-semibold shadow-sm shadow-blue-600/20 transition-colors no-underline shrink-0"
         >
           <span className="flex items-center justify-center w-4 h-4 rounded bg-white/15">
             <Plus size={11} strokeWidth={2.5} />
@@ -197,14 +197,14 @@ function MenuConfigurationPageContent() {
             onClick={() => setActiveModule(key)}
             className={`relative flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-semibold transition-colors ${
               activeModule === key
-                ? 'text-emerald-600 dark:text-emerald-400'
+                ? 'text-blue-600 dark:text-blue-400'
                 : 'text-gray-500 dark:text-navy-400 hover:text-gray-700 dark:hover:text-navy-200'
             }`}
           >
             <Icon size={13} strokeWidth={2} />
             {label}
             {activeModule === key && (
-              <motion.span layoutId="menu-config-tab" className="absolute left-0 right-0 -bottom-px h-[2px] bg-emerald-500 rounded-full" />
+              <motion.span layoutId="menu-config-tab" className="absolute left-0 right-0 -bottom-px h-[2px] bg-blue-500 rounded-full" />
             )}
           </button>
         ))}
@@ -239,7 +239,7 @@ function MenuConfigurationPageContent() {
                   <p className="text-[12.5px] text-gray-400 dark:text-navy-500">No fields for this module yet</p>
                   <Link
                     href={`/dashboard/menu-configuration/new?module=${activeModule}`}
-                    className="text-[11.5px] font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors no-underline"
+                    className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors no-underline"
                   >
                     Add one via New Field →
                   </Link>
@@ -264,12 +264,12 @@ function MenuConfigurationPageContent() {
                       {selectedFieldId === f.id && (
                         <motion.div
                           layoutId="field-active-bg"
-                          className="absolute inset-0 bg-emerald-50/70 dark:bg-emerald-950/20"
+                          className="absolute inset-0 bg-blue-50/70 dark:bg-blue-950/20"
                           transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                         />
                       )}
                       <div className="relative z-10 flex-1 min-w-0">
-                        <p className={`text-[12.5px] font-semibold truncate transition-colors ${selectedFieldId === f.id ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                        <p className={`text-[12.5px] font-semibold truncate transition-colors ${selectedFieldId === f.id ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
                           {f.field_label}
                         </p>
                         <p className="text-[10.5px] font-mono text-gray-400 dark:text-navy-500 truncate">{f.field_name} · {f.values.length} value{f.values.length === 1 ? '' : 's'}</p>
@@ -308,7 +308,7 @@ function MenuConfigurationPageContent() {
                   {fieldsInModule.length === 0 && (
                     <Link
                       href={`/dashboard/menu-configuration/new?module=${activeModule}`}
-                      className="text-[11.5px] font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors no-underline"
+                      className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors no-underline"
                     >
                       Add one via New Field →
                     </Link>
@@ -364,7 +364,7 @@ function MenuConfigurationPageContent() {
                             onClick={() => handleToggleActive(v)}
                             className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors ${
                               v.is_active
-                                ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400'
+                                ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'
                                 : 'bg-gray-100 dark:bg-navy-800 text-gray-400 dark:text-navy-500'
                             }`}
                           >
@@ -386,7 +386,7 @@ function MenuConfigurationPageContent() {
                   {isAddressField ? (
                     <form onSubmit={handleAddValue} className="flex flex-col gap-2 px-4 py-3 border-t border-gray-100 dark:border-navy-800">
                       <p className="text-[10.5px] text-gray-400 dark:text-navy-500">
-                        Name, street address, town, postcode and country are combined into the format Indigo export expects.
+                        Name, street address, town, postcode and country are combined into the format the export expects.
                       </p>
                       <input
                         type="text"
@@ -436,7 +436,7 @@ function MenuConfigurationPageContent() {
                         <button
                           type="submit"
                           disabled={!addressForm.name.trim() || !newLabel.trim() || isAdding}
-                          className="shrink-0 h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[12px] font-semibold transition-colors inline-flex items-center gap-1"
+                          className="shrink-0 h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-[12px] font-semibold transition-colors inline-flex items-center gap-1"
                         >
                           <Plus size={12} strokeWidth={2.5} /> Add
                         </button>
@@ -461,7 +461,7 @@ function MenuConfigurationPageContent() {
                       <button
                         type="submit"
                         disabled={!newValue.trim() || !newLabel.trim() || isAdding}
-                        className="shrink-0 h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[12px] font-semibold transition-colors inline-flex items-center gap-1"
+                        className="shrink-0 h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-[12px] font-semibold transition-colors inline-flex items-center gap-1"
                       >
                         <Plus size={12} strokeWidth={2.5} /> Add
                       </button>

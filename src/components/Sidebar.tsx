@@ -27,7 +27,7 @@ import { useLogoutMutation } from '@/services/authApi';
 import { useTheme } from '@/providers/ThemeProvider';
 
 const adminItems = [
-  { icon: Users, label: 'Users', color: 'bg-blue-500 text-white', href: '/dashboard/users' },
+  { icon: Users, label: 'Users', color: 'bg-rose-500 text-white', href: '/dashboard/users' },
   { icon: ShieldCheck, label: 'Roles', color: 'bg-purple-500 text-white', href: '/dashboard/roles' },
   { icon: ListTree, label: 'Configuration', color: 'bg-amber-500 text-white', href: '/dashboard/menu-configuration' },
   // Nexus is hidden from the menu — the page itself is untouched and still
@@ -159,7 +159,7 @@ export default function Sidebar({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search menu..."
                 aria-label="Search menu"
-                className="w-full h-8 pl-8 pr-2 bg-transparent border-0 border-b border-gray-200 dark:border-navy-700 text-[13px] text-gray-700 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
+                className="w-full h-8 pl-8 pr-2 bg-transparent border-0 border-b border-gray-200 dark:border-navy-700 text-[13px] text-gray-700 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-blue-500/60 transition-colors"
               />
             </div>
           )}
@@ -190,9 +190,9 @@ export default function Sidebar({
                       }`}
                     >
                       {isActive('/dashboard/manifests') && (
-                        <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-emerald-500" />
+                        <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-blue-500" />
                       )}
-                      <span className="flex-shrink-0 w-[22px] h-[22px] rounded-full flex items-center justify-center bg-emerald-500 text-white">
+                      <span className="flex-shrink-0 w-[22px] h-[22px] rounded-full flex items-center justify-center bg-blue-500 text-white">
                         <PackageCheck size={13} strokeWidth={2} />
                       </span>
                       <span className="flex-1 min-w-0 text-[13px] text-gray-700 dark:text-navy-200 truncate">Manifests</span>

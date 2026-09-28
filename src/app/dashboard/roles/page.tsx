@@ -66,11 +66,11 @@ function RolesPageContent() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name, key…"
             aria-label="Search roles"
-            className="w-56 h-8 px-2.5 bg-transparent border-0 border-b border-gray-200 dark:border-navy-700 text-[12px] text-gray-700 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
+            className="w-56 h-8 px-2.5 bg-transparent border-0 border-b border-gray-200 dark:border-navy-700 text-[12px] text-gray-700 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-blue-500/60 transition-colors"
           />
           <Link
             href="/dashboard/roles/new"
-            className="group inline-flex items-center gap-2 h-8 pl-2 pr-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-[12px] font-semibold shadow-sm shadow-emerald-600/20 transition-colors no-underline"
+            className="group inline-flex items-center gap-2 h-8 pl-2 pr-3 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-[12px] font-semibold shadow-sm shadow-blue-600/20 transition-colors no-underline"
           >
             <span className="flex items-center justify-center w-4 h-4 rounded bg-white/15">
               <Plus size={11} strokeWidth={2.5} />
@@ -120,10 +120,10 @@ function RolesPageContent() {
                 {filteredRoles.map((r) => (
                   <tr
                     key={r.id}
-                    className="group border-b border-gray-200 dark:border-navy-700 hover:border-emerald-300 dark:hover:border-emerald-700/50 hover:bg-gray-50/60 dark:hover:bg-navy-800/30 transition-colors"
+                    className="group border-b border-gray-200 dark:border-navy-700 hover:border-blue-300 dark:hover:border-blue-700/50 hover:bg-gray-50/60 dark:hover:bg-navy-800/30 transition-colors"
                   >
                     <td className="px-4 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap">
-                      <Link href={`/dashboard/roles/${r.id}`} className="font-semibold text-gray-900 dark:text-gray-100 text-[12.5px] hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+                      <Link href={`/dashboard/roles/${r.id}`} className="font-semibold text-gray-900 dark:text-gray-100 text-[12.5px] hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                         {r.name}
                       </Link>
                     </td>

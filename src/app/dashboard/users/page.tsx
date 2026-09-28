@@ -37,7 +37,7 @@ function UsersPageContent() {
     <motion.div variants={pageTransition} initial="hidden" animate="visible" className="space-y-4">
       <motion.div variants={staggerItem} className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2.5">
-          <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mt-0.5">
+          <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 flex items-center justify-center mt-0.5">
             <UsersIcon size={16} strokeWidth={2} />
           </span>
           <div>
@@ -55,11 +55,11 @@ function UsersPageContent() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name, email, role…"
             aria-label="Search users"
-            className="w-56 h-8 px-2.5 bg-transparent border-0 border-b border-gray-200 dark:border-navy-700 text-[12px] text-gray-700 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
+            className="w-56 h-8 px-2.5 bg-transparent border-0 border-b border-gray-200 dark:border-navy-700 text-[12px] text-gray-700 dark:text-navy-100 placeholder:text-gray-400 dark:placeholder:text-navy-500 focus:outline-none focus:border-blue-500/60 transition-colors"
           />
           <Link
             href="/dashboard/users/new"
-            className="group inline-flex items-center gap-2 h-8 pl-2 pr-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-[12px] font-semibold shadow-sm shadow-emerald-600/20 transition-colors no-underline"
+            className="group inline-flex items-center gap-2 h-8 pl-2 pr-3 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-[12px] font-semibold shadow-sm shadow-blue-600/20 transition-colors no-underline"
           >
             <span className="flex items-center justify-center w-4 h-4 rounded bg-white/15">
               <Plus size={11} strokeWidth={2.5} />
@@ -105,10 +105,10 @@ function UsersPageContent() {
                 {filteredUsers.map((u) => (
                   <tr
                     key={u.id}
-                    className="group border-b border-gray-200 dark:border-navy-700 hover:border-emerald-300 dark:hover:border-emerald-700/50 hover:bg-gray-50/60 dark:hover:bg-navy-800/30 transition-colors"
+                    className="group border-b border-gray-200 dark:border-navy-700 hover:border-blue-300 dark:hover:border-blue-700/50 hover:bg-gray-50/60 dark:hover:bg-navy-800/30 transition-colors"
                   >
                     <td className="px-4 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap">
-                      <Link href={`/dashboard/users/${u.id}`} className="font-semibold text-gray-900 dark:text-gray-100 text-[12.5px] hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+                      <Link href={`/dashboard/users/${u.id}`} className="font-semibold text-gray-900 dark:text-gray-100 text-[12.5px] hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                         {u.name}
                       </Link>
                     </td>
@@ -121,7 +121,7 @@ function UsersPageContent() {
                     <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap">
                       <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${
                         u.is_active
-                          ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                          ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
                           : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
                       }`}>
                         <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
@@ -135,7 +135,7 @@ function UsersPageContent() {
                           type="button"
                           disabled={isReactivating}
                           onClick={() => updateUser({ id: u.id, body: { is_active: true } })}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 transition-colors"
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 disabled:opacity-50 transition-colors"
                         >
                           <RefreshCw size={11} /> Reactivate
                         </button>

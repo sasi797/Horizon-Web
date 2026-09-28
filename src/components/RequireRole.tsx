@@ -6,7 +6,7 @@ import { useAppSelector } from '@/store/hooks';
 
 const Spinner = () => (
   <div className="min-h-[50vh] flex items-center justify-center">
-    <div className="w-6 h-6 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+    <div className="w-6 h-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
   </div>
 );
 
