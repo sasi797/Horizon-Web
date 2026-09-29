@@ -760,18 +760,19 @@ function buildDestinationStops(
   return stops;
 }
 
-// Groups stops for display only, by resolved address, anywhere in the run
-// order (not just adjacent ones) — a Delivery ending at a building and a
+// Groups stops for display, by resolved address, anywhere in the run order
+// (not just adjacent ones) — a Delivery ending at a building and a
 // Collection starting from that same building (e.g. an inbound HAWB dropped
 // off, an outbound one picked up, at the same hospital) are one physical
-// visit for the driver even though mytransport's own destination model has
-// no combined type we've confirmed (`collect_deliver` is documented and
-// live-tested as strictly 0 or 1 — see mytransport-export-integration.md),
-// so the Export payload still sends them as separate destinations. This only
-// changes how they're numbered and cased together in the preview — which is
-// also what makes editing one destination's address to match another (an
-// extraction gave the same real building two slightly different company
-// names) immediately fold them together on the next render.
+// visit for the driver, and this is now what actually gets booked too:
+// Horizon-Api's `build_mytransport_order_payload` folds the same pair into
+// one `collect_deliver: 2` destination (confirmed in EasyTrans' own JSON
+// order import spec — see mytransport-export-integration.md), not two. This
+// grouping only decides how they're numbered and cased together in the
+// preview; the real fold happens server-side at export time. Also what makes
+// editing one destination's address to match another (an extraction gave the
+// same real building two slightly different company names) immediately fold
+// them together on the next render.
 function groupDestinationStops(stops: DestinationStop[]): DestinationStop[][] {
   const groups: DestinationStop[][] = [];
   const groupByIdentity = new Map<string, DestinationStop[]>();
