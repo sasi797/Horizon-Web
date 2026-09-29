@@ -140,12 +140,12 @@ export default function Sidebar({
         {/* Search */}
         <div className={`pt-3 pb-1 ${collapsed ? 'px-1.5' : 'px-3'} transition-[padding] duration-300`}>
           {collapsed ? (
-            <Tooltip content="Search" side="right">
+            <Tooltip content="Search" side="right" className="flex w-full">
               <button
                 type="button"
                 aria-label="Search"
                 onClick={() => onToggleCollapse?.()}
-                className="w-7 h-7 mx-auto flex items-center justify-center rounded-md text-gray-500 dark:text-navy-400 hover:bg-gray-200/70 dark:hover:bg-white/5 hover:text-gray-800 dark:hover:text-white transition-colors"
+                className="w-full h-7 flex items-center justify-center rounded-md text-gray-500 dark:text-navy-400 hover:bg-gray-200/70 dark:hover:bg-white/5 hover:text-gray-800 dark:hover:text-white transition-colors"
               >
                 <Search size={16} strokeWidth={1.6} />
               </button>
@@ -165,7 +165,64 @@ export default function Sidebar({
           )}
         </div>
 
-        {!collapsed && (
+        {collapsed ? (
+          <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="px-1.5 pt-1 flex flex-col items-center gap-1">
+            {showManifests && (
+              <Tooltip content="Manifests" side="right">
+                <Link href="/dashboard/manifests" onClick={onClose} className="no-underline">
+                  <motion.div
+                    variants={staggerItem}
+                    className={`w-8 h-8 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
+                      isActive('/dashboard/manifests')
+                        ? 'bg-gray-200/70 dark:bg-white/10'
+                        : 'hover:bg-gray-200/70 dark:hover:bg-white/5'
+                    }`}
+                  >
+                    <span className="w-[22px] h-[22px] rounded-full flex items-center justify-center bg-blue-500 text-white">
+                      <PackageCheck size={13} strokeWidth={2} />
+                    </span>
+                  </motion.div>
+                </Link>
+              </Tooltip>
+            )}
+
+            {showManifests && filteredAdmin.length > 0 && (
+              <div className="w-6 h-px bg-gray-200 dark:bg-navy-700 my-1" />
+            )}
+            {filteredAdmin.map(({ icon: Icon, label, color, href }) => (
+              <Tooltip key={label} content={label} side="right">
+                <Link href={href} onClick={onClose} className="no-underline">
+                  <motion.div
+                    variants={staggerItem}
+                    className={`w-8 h-8 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
+                      isActive(href)
+                        ? 'bg-gray-200/70 dark:bg-white/10'
+                        : 'hover:bg-gray-200/70 dark:hover:bg-white/5'
+                    }`}
+                  >
+                    <span className={`w-[22px] h-[22px] rounded-md flex items-center justify-center ${color}`}>
+                      <Icon size={13} strokeWidth={2} />
+                    </span>
+                  </motion.div>
+                </Link>
+              </Tooltip>
+            ))}
+
+            {(showManifests || filteredAdmin.length > 0) && filteredSystem.length > 0 && (
+              <div className="w-6 h-px bg-gray-200 dark:bg-navy-700 my-1" />
+            )}
+            {filteredSystem.map(({ icon: Icon, label }) => (
+              <Tooltip key={label} content={label} side="right">
+                <motion.div
+                  variants={staggerItem}
+                  className="w-8 h-8 rounded-md flex items-center justify-center text-gray-400 dark:text-navy-500 hover:bg-gray-200/70 dark:hover:bg-white/5 cursor-pointer transition-colors"
+                >
+                  <Icon size={15} strokeWidth={1.6} />
+                </motion.div>
+              </Tooltip>
+            ))}
+          </motion.div>
+        ) : (
           <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="px-3">
 
             {!hasResults && (
