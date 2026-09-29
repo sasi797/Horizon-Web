@@ -809,6 +809,7 @@ export default function ManifestDetailPage() {
   const { data: savedStartPoints = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'start_point' });
   const { data: savedEndPoints = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'end_point' });
   const { data: savedAccountNumbers = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'account_number' });
+  const { data: savedCustomerNumbers = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'customer_number' });
   const { data: savedServiceTypes = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'service_type' });
   const { data: savedVehicleSizes = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'vehicle_size' });
 
@@ -824,7 +825,7 @@ export default function ManifestDetailPage() {
   const [jobForm, setJobForm] = useState<JobForm | null>(null);
   const [syncedFormFor, setSyncedFormFor] = useState<string | null>(null);
   const [manifestFields, setManifestFields] = useState({
-    start_point: '', end_point: '', job_reference: '', account_number: '', vehicle_size: '',
+    start_point: '', end_point: '', job_reference: '', account_number: '', customer_number: '', vehicle_size: '',
     service_type: '', skip_end_destination: false,
   });
   const [syncedPointsFor, setSyncedPointsFor] = useState<string | undefined>(undefined);
@@ -902,6 +903,7 @@ export default function ManifestDetailPage() {
       end_point: manifest.end_point ?? '',
       job_reference: manifest.job_reference ?? '',
       account_number: manifest.account_number ?? '',
+      customer_number: manifest.customer_number ?? '',
       vehicle_size: manifest.vehicle_size ?? '',
       service_type: manifest.service_type ?? '',
       skip_end_destination: manifest.skip_end_destination,
@@ -1090,6 +1092,7 @@ export default function ManifestDetailPage() {
     ]).entries(),
   ).map(([value, label]) => ({ value, label }));
   const accountNumberOptions = savedAccountNumbers.map(v => ({ value: v.value, label: v.label }));
+  const customerNumberOptions = savedCustomerNumbers.map(v => ({ value: v.value, label: v.label }));
   const serviceTypeOptions = savedServiceTypes.map(v => ({ value: v.value, label: v.label }));
   const vehicleSizeOptions = savedVehicleSizes.map(v => ({ value: v.value, label: v.label }));
   const withCurrentValue = (options: { value: string; label: string }[], current: string) =>
@@ -1121,7 +1124,7 @@ export default function ManifestDetailPage() {
   };
 
   const saveManifestField = async (
-    field: 'start_point' | 'end_point' | 'job_reference' | 'account_number' | 'vehicle_size' | 'service_type',
+    field: 'start_point' | 'end_point' | 'job_reference' | 'account_number' | 'customer_number' | 'vehicle_size' | 'service_type',
     value: string,
   ) => {
     if (locked) return;
@@ -1383,7 +1386,7 @@ export default function ManifestDetailPage() {
           </Tooltip>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-x-3.5 gap-y-2.5 pt-3 border-t border-dashed border-gray-200 dark:border-navy-800">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-x-3.5 gap-y-2.5 pt-3 border-t border-dashed border-gray-200 dark:border-navy-800">
           <div className="min-w-0">
             <PropLabel icon={Navigation} iconTone={ROW2_ICON_TONE} required>Start point</PropLabel>
             <LocationSelect
@@ -1447,6 +1450,20 @@ export default function ManifestDetailPage() {
               onChange={value => {
                 setManifestFields(f => ({ ...f, account_number: value }));
                 saveManifestField('account_number', value);
+              }}
+            />
+          </div>
+          <div className="min-w-0">
+            <PropLabel icon={Hash} iconTone={ROW2_ICON_TONE} required>Customer number</PropLabel>
+            <LocationSelect
+              disabled={locked}
+              value={manifestFields.customer_number}
+              emptyLabel="Empty"
+              tag="gray"
+              options={withCurrentValue(customerNumberOptions, manifestFields.customer_number)}
+              onChange={value => {
+                setManifestFields(f => ({ ...f, customer_number: value }));
+                saveManifestField('customer_number', value);
               }}
             />
           </div>
