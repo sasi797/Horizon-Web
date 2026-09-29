@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as Rea
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, ChevronLeft, ChevronDown, Check, Package, CalendarDays, RefreshCw, CaseSensitive, CircleDot, Hash, User, File, Search, X, CheckCircle2, FileSearch, MessageSquare, History, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { ChevronRight, ChevronLeft, ChevronDown, Check, Package, CalendarDays, RefreshCw, CaseSensitive, CircleDot, Hash, User, File, Search, X, CheckCircle2, FileSearch, MessageSquare, History, ArrowUp, ArrowDown, ArrowUpDown, LayoutList, Clock, PackageCheck, Bot } from 'lucide-react';
 import { pageTransition, staggerItem } from '@/lib/animations';
 import {
   useGetHawbManifestsQuery, useGetJobUpdatesQuery, useGetProcessingDocumentsQuery, useRetryManifestExtractionMutation,
@@ -19,7 +19,7 @@ const STATUS_BADGE: Record<string, string> = {
   booked: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
   confirmed: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
   on_hold: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
-  exported: 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300',
+  exported: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
   cancelled: 'bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400',
   ignored: 'bg-gray-100 dark:bg-navy-800 text-gray-500 dark:text-navy-400',
 };
@@ -44,21 +44,6 @@ const EXTRACT_LABEL: Record<'loading' | 'completed' | 'failed' | 'ignored', stri
   failed: 'Failed',
   ignored: 'Skipped (duplicate)',
 };
-
-const TAG_COLORS = [
-  'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300',
-  'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
-  'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
-  'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
-  'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
-  'bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-300',
-];
-
-function tagColor(label: string): string {
-  let hash = 0;
-  for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) >>> 0;
-  return TAG_COLORS[hash % TAG_COLORS.length];
-}
 
 const STATUS_LABEL: Record<string, string> = {
   pending_review: 'Pending Review',
@@ -106,7 +91,7 @@ function PendingUpdateBadge({ count, className = '' }: { count: number; classNam
 
 function HawbTag({ value }: { value: string }) {
   return (
-    <span className="inline-flex items-center font-mono text-[10.5px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-navy-300">
+    <span className="inline-flex items-center font-mono text-[10.5px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap bg-gray-200 dark:bg-navy-800 text-gray-700 dark:text-navy-300">
       {value}
     </span>
   );
@@ -174,7 +159,7 @@ function HawbNumbersCell({ hawbNumbers }: { hawbNumbers: string[] }) {
           className={`shrink-0 text-[10.5px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap transition-colors ${
             open
               ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400'
-              : 'bg-gray-50 dark:bg-navy-800/60 text-gray-400 dark:text-navy-500 hover:bg-gray-100 dark:hover:bg-navy-800'
+              : 'bg-gray-100 dark:bg-navy-800/60 text-gray-500 dark:text-navy-500 hover:bg-gray-200 dark:hover:bg-navy-800'
           }`}
         >
           +{overflowCount} more
@@ -388,11 +373,11 @@ export default function ManifestsPage() {
   // "Pending" here mirrors the Status column's own Pending badge (m.status
   // extracting/failed) rather than the separate 'pending_review' status —
   // that's what the badge actually reads for the rows this tab is meant to catch.
-  const STATUS_TABS: { key: typeof statusTab; label: string; match: (m: (typeof manifests)[number]) => boolean }[] = [
-    { key: 'all', label: 'All', match: () => true },
-    { key: 'open', label: 'Open', match: m => m.status === 'open' },
-    { key: 'pending', label: 'Pending', match: m => m.status === 'extracting' || m.status === 'failed' },
-    { key: 'exported', label: 'Exported', match: m => m.status === 'exported' },
+  const STATUS_TABS: { key: typeof statusTab; label: string; icon: typeof CircleDot; match: (m: (typeof manifests)[number]) => boolean }[] = [
+    { key: 'all', label: 'All', icon: LayoutList, match: () => true },
+    { key: 'open', label: 'Open', icon: CircleDot, match: m => m.status === 'open' },
+    { key: 'pending', label: 'Pending', icon: Clock, match: m => m.status === 'extracting' || m.status === 'failed' },
+    { key: 'exported', label: 'Exported', icon: PackageCheck, match: m => m.status === 'exported' },
   ];
   const statusFilteredManifests = manifests.filter(STATUS_TABS.find(t => t.key === statusTab)!.match);
 
@@ -462,26 +447,27 @@ export default function ManifestsPage() {
         </div>
       </motion.div>
 
-      <motion.div variants={staggerItem} className="inline-flex items-center gap-1 p-1 bg-gray-100 dark:bg-navy-800/60 rounded-lg w-fit">
-        {STATUS_TABS.map(({ key, label }) => (
+      <motion.div variants={staggerItem} className="flex items-center gap-5 border-b border-gray-200 dark:border-navy-700">
+        {STATUS_TABS.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             type="button"
             onClick={() => { setStatusTab(key); setPage(0); }}
-            className={`relative px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors ${
+            className={`relative inline-flex items-center gap-1.5 pb-2.5 text-[13px] font-semibold transition-colors ${
               statusTab === key
                 ? 'text-gray-900 dark:text-gray-100'
                 : 'text-gray-500 dark:text-navy-400 hover:text-gray-700 dark:hover:text-navy-200'
             }`}
           >
+            <Icon size={13} strokeWidth={1.8} />
+            {label}
             {statusTab === key && (
               <motion.span
                 layoutId="manifest-status-tab-bg"
-                className="absolute inset-0 bg-white dark:bg-navy-900 rounded-md shadow-sm"
+                className="absolute left-0 right-0 -bottom-px h-[2px] bg-gray-900 dark:bg-gray-100 rounded-full"
                 transition={{ type: 'spring', stiffness: 500, damping: 40 }}
               />
             )}
-            <span className="relative z-10">{label}</span>
           </button>
         ))}
       </motion.div>
@@ -571,13 +557,13 @@ export default function ManifestsPage() {
                     className={`group relative border-b border-gray-200 dark:border-navy-700 outline-none transition-colors duration-150 ${
                       isPending
                         ? ''
-                        : 'cursor-pointer hover:z-10 focus-visible:z-10 hover:bg-blue-50/40 dark:hover:bg-blue-950/10 hover:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.3)] dark:hover:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.2)] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400'
+                        : 'cursor-pointer hover:z-10 focus-visible:z-10 hover:bg-gray-50 dark:hover:bg-navy-800/40 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-gray-300 dark:focus-visible:ring-navy-600'
                     }`}
                   >
                     <td className="px-4 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap group-hover:rounded-l-lg">
                       <span className="inline-flex items-center gap-1.5">
-                        <File size={13} strokeWidth={1.8} className="text-gray-300 dark:text-navy-600 shrink-0 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
-                        <span className="font-mono font-semibold text-gray-900 dark:text-gray-100 text-[12.5px] group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        <File size={13} strokeWidth={1.8} className="text-gray-300 dark:text-navy-600 shrink-0 group-hover:text-gray-500 dark:group-hover:text-navy-400 transition-colors" />
+                        <span className="font-mono font-semibold text-gray-900 dark:text-gray-100 text-[12.5px] transition-colors">
                           {m.reference_number}
                         </span>
                         <PendingUpdateBadge count={pendingUpdateCounts.get(m.id) ?? 0} />
@@ -630,21 +616,24 @@ export default function ManifestsPage() {
                         <span className="text-gray-300 dark:text-navy-600">—</span>
                       )}
                     </td>
-                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] font-medium text-gray-700 dark:text-navy-200">{isPending ? '—' : m.job_count}</td>
+                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] font-medium text-black dark:text-white">{isPending ? '—' : m.job_count}</td>
                     <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 max-w-[280px]">
                       {isPending ? <span className="text-[12px] text-gray-400 dark:text-navy-500">—</span> : <HawbNumbersCell hawbNumbers={m.hawb_numbers} />}
                     </td>
-                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] font-medium text-gray-700 dark:text-navy-200">{isPending ? '—' : m.total_weight_kg}</td>
-                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 whitespace-nowrap">
-                      <span className={`inline-flex items-center text-[11px] font-medium px-2.5 py-1 rounded-full ${tagColor(m.created_by_name ?? 'System')}`}>
+                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] font-medium text-black dark:text-white">{isPending ? '—' : m.total_weight_kg}</td>
+                    <td className="px-2 py-2 border-r border-gray-200 dark:border-navy-700 text-[12px] text-black dark:text-white whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5">
+                        {m.created_by_name
+                          ? <User size={12} strokeWidth={1.8} className="text-gray-400 dark:text-navy-500 shrink-0" />
+                          : <Bot size={12} strokeWidth={1.8} className="text-gray-400 dark:text-navy-500 shrink-0" />}
                         {m.created_by_name ?? 'System'}
                       </span>
                     </td>
                     <td className="pl-2 pr-4 py-2 whitespace-nowrap group-hover:rounded-r-lg">
                       <span className="inline-flex items-center gap-1">
-                        <span className="text-[11px] text-gray-500 dark:text-navy-400">{formatDateTime(m.created_at)}</span>
+                        <span className="text-[11px] text-black dark:text-white">{formatDateTime(m.created_at)}</span>
                         {!isPending && (
-                          <ChevronRight size={13} className="ml-1 text-gray-300 dark:text-navy-600 opacity-0 -translate-x-0.5 group-hover:opacity-100 group-hover:translate-x-0 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-all" />
+                          <ChevronRight size={13} className="ml-1 text-gray-300 dark:text-navy-600 opacity-0 -translate-x-0.5 group-hover:opacity-100 group-hover:translate-x-0 group-hover:text-gray-500 dark:group-hover:text-navy-400 transition-all" />
                         )}
                       </span>
                     </td>
