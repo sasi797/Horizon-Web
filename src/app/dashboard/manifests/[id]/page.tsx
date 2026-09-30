@@ -478,6 +478,15 @@ function LocationSelect({
             {options.length === 0 && (
               <p className="px-3 py-2 text-[12px] text-gray-500 dark:text-navy-500">No locations available</p>
             )}
+            {value && (
+              <button
+                type="button"
+                onClick={() => { onChange(''); setOpen(false); }}
+                className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-[12.5px] text-gray-400 dark:text-navy-500 hover:bg-gray-50 dark:hover:bg-navy-700 transition-colors"
+              >
+                <span className="truncate italic">{emptyLabel}</span>
+              </button>
+            )}
             {options.map(o => {
               const isSelected = o.value === value;
               return (
@@ -655,14 +664,13 @@ type DestinationStop = {
 // collapse loop below), End point]. The route always closes at its own End
 // point — whatever the dispatcher actually picked there, which is often but
 // not always the same address as Start point — regardless of whether a job
-// already supplied a real Delivery leg, unless skipEndDestination opts out.
+// already supplied a real Delivery leg.
 // Edits made here write straight to the same job/manifest fields Export
 // reads at send time, so there's no separate destinations record to keep in
 // sync — this just reads what's already there.
 function buildDestinationStops(
   startPoint: string,
   endPoint: string,
-  skipEndDestination: boolean,
   mergeSlots: { key: string; jobs: HawbJob[] }[],
 ): DestinationStop[] {
   const stops: DestinationStop[] = [];
@@ -738,24 +746,22 @@ function buildDestinationStops(
     });
   }
 
-  if (!skipEndDestination) {
-    stops.push(endPoint ? {
-      key: 'end',
-      kind: 'end',
-      collectDeliver: 1,
-      address: endPoint,
-      hawbNumbers: [],
-      editTarget: { kind: 'manifest', field: 'end_point' },
-    } : {
-      key: 'end',
-      kind: 'end',
-      collectDeliver: 1,
-      address: '',
-      hawbNumbers: [],
-      incomplete: true,
-      editTarget: { kind: 'manifest', field: 'end_point' },
-    });
-  }
+  stops.push(endPoint ? {
+    key: 'end',
+    kind: 'end',
+    collectDeliver: 1,
+    address: endPoint,
+    hawbNumbers: [],
+    editTarget: { kind: 'manifest', field: 'end_point' },
+  } : {
+    key: 'end',
+    kind: 'end',
+    collectDeliver: 1,
+    address: '',
+    hawbNumbers: [],
+    incomplete: true,
+    editTarget: { kind: 'manifest', field: 'end_point' },
+  });
 
   return stops;
 }
@@ -826,7 +832,7 @@ export default function ManifestDetailPage() {
   const [syncedFormFor, setSyncedFormFor] = useState<string | null>(null);
   const [manifestFields, setManifestFields] = useState({
     start_point: '', end_point: '', job_reference: '', account_number: '', customer_number: '', vehicle_size: '',
-    service_type: '', skip_end_destination: false,
+    service_type: '',
   });
   const [syncedPointsFor, setSyncedPointsFor] = useState<string | undefined>(undefined);
   // Whether the Run order / Destinations preview should fall back to Start
@@ -906,7 +912,6 @@ export default function ManifestDetailPage() {
       customer_number: manifest.customer_number ?? '',
       vehicle_size: manifest.vehicle_size ?? '',
       service_type: manifest.service_type ?? '',
-      skip_end_destination: manifest.skip_end_destination,
     });
   }
 
@@ -1042,7 +1047,7 @@ export default function ManifestDetailPage() {
   // shouldn't close at Start point but End point isn't decided yet.
   const effectiveEndPoint = manifestFields.end_point || (endMatchesStart ? manifestFields.start_point : '');
   const destinationStops = buildDestinationStops(
-    manifestFields.start_point, effectiveEndPoint, manifestFields.skip_end_destination, mergeSlots,
+    manifestFields.start_point, effectiveEndPoint, mergeSlots,
   );
   const destinationGroups = groupDestinationStops(destinationStops);
   const missingExportFields = [
@@ -1130,16 +1135,6 @@ export default function ManifestDetailPage() {
     if (locked) return;
     try {
       await updateManifest({ id: manifest.id, body: { [field]: value || null } }).unwrap();
-    } catch {
-      // reverts to server value on next refetch
-    }
-  };
-
-  const toggleSkipEndDestination = async (checked: boolean) => {
-    if (locked) return;
-    setManifestFields(f => ({ ...f, skip_end_destination: checked }));
-    try {
-      await updateManifest({ id: manifest.id, body: { skip_end_destination: checked } }).unwrap();
     } catch {
       // reverts to server value on next refetch
     }
@@ -1412,19 +1407,7 @@ export default function ManifestDetailPage() {
                 saveManifestField('end_point', value);
               }}
             />
-            <Tooltip content="Export always books End point as the route's final destination — check this for a manifest that genuinely has nowhere to close the loop" side="bottom">
-              <label className={`flex items-center gap-1.5 mt-1.5 -mx-2 px-2 py-1 rounded-md text-[10.5px] font-medium text-gray-500 dark:text-navy-400 ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-navy-800/60'}`}>
-                <input
-                  type="checkbox"
-                  disabled={locked}
-                  checked={manifestFields.skip_end_destination}
-                  onChange={e => toggleSkipEndDestination(e.target.checked)}
-                  className="rounded cursor-pointer accent-gray-700 dark:accent-navy-300"
-                />
-                Don&apos;t add End point as a destination
-              </label>
-            </Tooltip>
-            {!manifestFields.end_point && !manifestFields.skip_end_destination && (
+            {!manifestFields.end_point && manifestFields.start_point && (
               <Tooltip content="Uncheck this if the route shouldn't default to closing back at Start point — the run order will flag End point as unresolved until you pick one" side="bottom">
                 <label className={`flex items-center gap-1.5 mt-1 -mx-2 px-2 py-1 rounded-md text-[10.5px] font-medium text-gray-500 dark:text-navy-400 ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-navy-800/60'}`}>
                   <input
