@@ -188,3 +188,4 @@ export function buildAddress(parts: AddressParts): string {
   if (parts.country.trim()) lines.push(parts.country.trim());
   return lines.join('\n');
 }
+
