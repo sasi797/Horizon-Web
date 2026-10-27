@@ -484,7 +484,7 @@ function LocationSelect({
                 onClick={() => { onChange(''); setOpen(false); }}
                 className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 text-[12.5px] text-gray-400 dark:text-navy-500 hover:bg-gray-50 dark:hover:bg-navy-700 transition-colors"
               >
-                <span className="truncate italic">{emptyLabel}</span>
+                <span className="truncate italic">Clear selection</span>
               </button>
             )}
             {options.map(o => {
@@ -529,6 +529,14 @@ function defaultServiceType(job: HawbJob): JobServiceType | null {
   const toUk = isUkAddress(job.consignee);
   if (fromUk === toUk) return null;
   return fromUk ? 'collection' : 'delivery';
+}
+
+// A UK-to-UK job needs the driver to do both legs, so it always books as two
+// stops (collection at the shipper address, delivery at the consignee
+// address) regardless of whichever single value is picked in the Del/Coll
+// toggle — or none at all.
+function isUkRoundTrip(job: HawbJob): boolean {
+  return isUkAddress(job.shipper) && isUkAddress(job.consignee);
 }
 
 function ServiceTypePicker({
@@ -672,6 +680,7 @@ function buildDestinationStops(
   startPoint: string,
   endPoint: string,
   mergeSlots: { key: string; jobs: HawbJob[] }[],
+  closeAtEndPoint = true,
 ): DestinationStop[] {
   const stops: DestinationStop[] = [];
 
@@ -693,7 +702,12 @@ function buildDestinationStops(
     const hawbNumbers = group.map(j => j.hawb_number);
     const jobIds = group.map(j => j.id);
 
-    if (job.job_service_type !== 'collection' && job.job_service_type !== 'delivery') {
+    // A UK-to-UK job is driven both ways, so it books Pick-up + Delivery
+    // whatever Del/Coll says (or doesn't) — mirrors Horizon-Api's
+    // mytransport_export.normalize_uk_round_trips.
+    const sameDayRoundTrip = isUkRoundTrip(job) || job.job_service_type === 'collection_and_delivery';
+
+    if (!sameDayRoundTrip && job.job_service_type !== 'collection' && job.job_service_type !== 'delivery') {
       stops.push({
         key: slot.key,
         kind: 'stop',
@@ -706,62 +720,65 @@ function buildDestinationStops(
       continue;
     }
 
-    const isCollection = job.job_service_type === 'collection';
-    const field: 'shipper' | 'consignee' = isCollection ? 'shipper' : 'consignee';
-    const address = (isCollection ? job.shipper : job.consignee) ?? '';
-    const collectDeliver: 0 | 1 = isCollection ? 0 : 1;
+    const legs: { key: string; field: 'shipper' | 'consignee'; address: string; collectDeliver: 0 | 1 }[] =
+      sameDayRoundTrip
+        ? [
+          { key: `${slot.key}-collect`, field: 'shipper', address: job.shipper ?? '', collectDeliver: 0 },
+          { key: `${slot.key}-deliver`, field: 'consignee', address: job.consignee ?? '', collectDeliver: 1 },
+        ]
+        : job.job_service_type === 'collection'
+          ? [{ key: slot.key, field: 'shipper', address: job.shipper ?? '', collectDeliver: 0 }]
+          : [{ key: slot.key, field: 'consignee', address: job.consignee ?? '', collectDeliver: 1 }];
 
-    // Two different run-order slots (no shared consignee/contact, so they
-    // weren't merged on the Merge tab) can still resolve to the exact same
-    // physical stop — e.g. two collections from the same building, anywhere
-    // in the run order, whose company name was OCR'd slightly differently
-    // per HAWB. Booking them as separate destinations would send the driver
-    // to the same building twice, so any earlier stop (not just the
-    // immediately preceding one) with the same leg and the same resolved
-    // address identity absorbs this one instead of a new stop being added —
-    // which is also what makes editing a destination's address to fix an
-    // extraction mismatch immediately fold it into its real match on the
-    // next render. Mirrors Horizon-Api's _collapse_same_stop_groups.
-    const identity = addressIdentityKey(address);
-    const match = identity !== null
-      ? stops.find(s =>
-        s.kind === 'stop' && !s.incomplete && s.collectDeliver === collectDeliver
-        && addressIdentityKey(s.address) === identity)
-      : undefined;
-    if (match) {
-      match.hawbNumbers = [...match.hawbNumbers, ...hawbNumbers];
-      if (match.editTarget.kind === 'jobs') {
-        match.editTarget = { kind: 'jobs', field: match.editTarget.field, jobIds: [...match.editTarget.jobIds, ...jobIds] };
+    for (const leg of legs) {
+      // Two different run-order slots (no shared consignee/contact, so they
+      // weren't merged on the Merge tab) can still resolve to the exact same
+      // physical stop — e.g. two collections from the same building, anywhere
+      // in the run order, whose company name was OCR'd slightly differently
+      // per HAWB. Booking them as separate destinations would send the driver
+      // to the same building twice, so any earlier stop (not just the
+      // immediately preceding one) with the same leg and the same resolved
+      // address identity absorbs this one instead of a new stop being added —
+      // which is also what makes editing a destination's address to fix an
+      // extraction mismatch immediately fold it into its real match on the
+      // next render. Mirrors Horizon-Api's _collapse_same_stop_groups.
+      const identity = addressIdentityKey(leg.address);
+      const match = identity !== null
+        ? stops.find(s =>
+          s.kind === 'stop' && !s.incomplete && s.collectDeliver === leg.collectDeliver
+          && addressIdentityKey(s.address) === identity)
+        : undefined;
+      if (match) {
+        match.hawbNumbers = [...match.hawbNumbers, ...hawbNumbers];
+        if (match.editTarget.kind === 'jobs') {
+          match.editTarget = { kind: 'jobs', field: match.editTarget.field, jobIds: [...match.editTarget.jobIds, ...jobIds] };
+        }
+        continue;
       }
-      continue;
-    }
 
-    stops.push({
-      key: slot.key,
-      kind: 'stop',
-      collectDeliver,
-      address,
-      hawbNumbers,
-      editTarget: { kind: 'jobs', field, jobIds },
-    });
+      stops.push({
+        key: leg.key,
+        kind: 'stop',
+        collectDeliver: leg.collectDeliver,
+        address: leg.address,
+        hawbNumbers,
+        editTarget: { kind: 'jobs', field: leg.field, jobIds },
+      });
+    }
   }
 
-  stops.push(endPoint ? {
-    key: 'end',
-    kind: 'end',
-    collectDeliver: 1,
-    address: endPoint,
-    hawbNumbers: [],
-    editTarget: { kind: 'manifest', field: 'end_point' },
-  } : {
-    key: 'end',
-    kind: 'end',
-    collectDeliver: 1,
-    address: '',
-    hawbNumbers: [],
-    incomplete: true,
-    editTarget: { kind: 'manifest', field: 'end_point' },
-  });
+  // Like the Start point row above, the End point row only shows once there's
+  // an End point to show — no "Set End point" placeholder when none is chosen.
+  if (closeAtEndPoint && endPoint) {
+    stops.push({
+      key: 'end',
+      kind: 'end',
+      collectDeliver: 1,
+      address: endPoint,
+      hawbNumbers: [],
+      editTarget: { kind: 'manifest', field: 'end_point' },
+    });
+  }
 
   return stops;
 }
@@ -1024,7 +1041,7 @@ export default function ManifestDetailPage() {
   const dgCount = orderedJobs.filter(j => j.dangerous_goods).length;
   const packageCount = orderedJobs.reduce((sum, j) => sum + (j.package_qty ?? 0), 0);
   const jobIdsWithUpdates = new Set(jobUpdates.map(u => u.job_id));
-  const jobsMissingService = orderedJobs.filter(j => !j.job_service_type).length;
+  const jobsMissingService = orderedJobs.filter(j => !j.job_service_type && !isUkRoundTrip(j)).length;
   // A parsed shipper/consignee field only blocks export if it still holds the
   // literal "Blinded Data" placeholder an extractor drops in for a redacted
   // blinded-trial address. Blank fields are allowed through — e.g. addresses
@@ -1045,13 +1062,26 @@ export default function ManifestDetailPage() {
   // itself stays blank until the dispatcher picks something. The dispatcher
   // can turn this fallback off (endMatchesStart) when the route genuinely
   // shouldn't close at Start point but End point isn't decided yet.
+  // Thinventory manifests (THINV-…) have no Start/End point — each job is just
+  // its own Collection + Delivery — and book into EasyTrans only (Horizon-Api's
+  // thinv_auto_export), so those fields, the closing End stop and Indigo are
+  // all left out for them.
+  const isThinv = manifest.reference_number.startsWith('THINV-');
   const effectiveEndPoint = manifestFields.end_point || (endMatchesStart ? manifestFields.start_point : '');
   const destinationStops = buildDestinationStops(
-    manifestFields.start_point, effectiveEndPoint, mergeSlots,
+    manifestFields.start_point, effectiveEndPoint, mergeSlots, !isThinv,
   );
   const destinationGroups = groupDestinationStops(destinationStops);
   const missingExportFields = [
-    !manifestFields.start_point && 'Start point',
+    // Every field marked required (red dot) above. End point counts as filled
+    // when it defaults to Start point (the tick box under it).
+    !isThinv && !manifestFields.start_point && 'Start point',
+    !isThinv && !effectiveEndPoint && 'End point',
+    !isThinv && !manifestFields.account_number && 'Account number',
+    !manifestFields.customer_number && 'Customer number',
+    !manifestFields.service_type && 'Service type',
+    !manifestFields.vehicle_size && 'Vehicle size',
+    !manifestFields.job_reference.trim() && 'Job reference',
     jobsMissingService > 0 && `Del/Coll on ${jobsMissingService} job${jobsMissingService === 1 ? '' : 's'}`,
     jobsWithIncompleteAddress > 0 && `Shipper/Consignee details on ${jobsWithIncompleteAddress} job${jobsWithIncompleteAddress === 1 ? '' : 's'}`,
   ].filter((v): v is string => Boolean(v));
@@ -1059,7 +1089,7 @@ export default function ManifestDetailPage() {
   // (as a retry, not a fresh export) whenever the manifest already locked
   // but one of the two still hasn't booked.
   const canRetryExport = manifest.status === 'exported'
-    && (manifest.indigo_export_status !== 'booked' || manifest.mytransport_export_status !== 'booked');
+    && ((!isThinv && manifest.indigo_export_status !== 'booked') || manifest.mytransport_export_status !== 'booked');
   const showExportButton = (manifest.status === 'open' && !locked) || canRetryExport;
 
   // Start/end point pickers offer the Configuration defaults (module 'manifest',
@@ -1309,12 +1339,14 @@ export default function ManifestDetailPage() {
 
       {(manifest.indigo_export_status || manifest.mytransport_export_status) && (
         <motion.div variants={staggerItem} className="flex flex-wrap items-center gap-2">
-          <CarrierExportStatus
-            label="Indigo"
-            status={manifest.indigo_export_status}
-            reference={manifest.indigo_job_number}
-            error={manifest.indigo_export_error}
-          />
+          {!isThinv && (
+            <CarrierExportStatus
+              label="Indigo"
+              status={manifest.indigo_export_status}
+              reference={manifest.indigo_job_number}
+              error={manifest.indigo_export_error}
+            />
+          )}
           <CarrierExportStatus
             label="EasyTrans"
             status={manifest.mytransport_export_status}
@@ -1381,13 +1413,14 @@ export default function ManifestDetailPage() {
           </Tooltip>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-x-3.5 gap-y-2.5 pt-3 border-t border-dashed border-gray-200 dark:border-navy-800">
+        <div className={`grid grid-cols-2 sm:grid-cols-3 ${isThinv ? 'md:grid-cols-4' : 'md:grid-cols-7'} gap-x-3.5 gap-y-2.5 pt-3 border-t border-dashed border-gray-200 dark:border-navy-800`}>
+          {!isThinv && (<>
           <div className="min-w-0">
             <PropLabel icon={Navigation} iconTone={ROW2_ICON_TONE} required>Start point</PropLabel>
             <LocationSelect
               disabled={locked}
               value={manifestFields.start_point}
-              emptyLabel="Empty"
+              emptyLabel="Select start point"
               options={withCurrentValue(startOptions, manifestFields.start_point)}
               onChange={value => {
                 setManifestFields(f => ({ ...f, start_point: value }));
@@ -1400,7 +1433,7 @@ export default function ManifestDetailPage() {
             <LocationSelect
               disabled={locked}
               value={manifestFields.end_point}
-              emptyLabel="Empty"
+              emptyLabel="Select end point"
               options={withCurrentValue(endOptions, manifestFields.end_point)}
               onChange={value => {
                 setManifestFields(f => ({ ...f, end_point: value }));
@@ -1427,7 +1460,7 @@ export default function ManifestDetailPage() {
             <LocationSelect
               disabled={locked}
               value={manifestFields.account_number}
-              emptyLabel="Empty"
+              emptyLabel="Select account number"
               tag="gray"
               options={withCurrentValue(accountNumberOptions, manifestFields.account_number)}
               onChange={value => {
@@ -1436,12 +1469,13 @@ export default function ManifestDetailPage() {
               }}
             />
           </div>
+          </>)}
           <div className="min-w-0">
             <PropLabel icon={Hash} iconTone={ROW2_ICON_TONE} required>Customer number</PropLabel>
             <LocationSelect
               disabled={locked}
               value={manifestFields.customer_number}
-              emptyLabel="Empty"
+              emptyLabel="Select customer number"
               tag="gray"
               options={withCurrentValue(customerNumberOptions, manifestFields.customer_number)}
               onChange={value => {
@@ -1455,7 +1489,7 @@ export default function ManifestDetailPage() {
             <LocationSelect
               disabled={locked}
               value={manifestFields.service_type}
-              emptyLabel="Empty"
+              emptyLabel="Select service type"
               tag="blue"
               options={withCurrentValue(serviceTypeOptions, manifestFields.service_type)}
               onChange={value => {
@@ -1469,7 +1503,7 @@ export default function ManifestDetailPage() {
             <LocationSelect
               disabled={locked}
               value={manifestFields.vehicle_size}
-              emptyLabel="Empty"
+              emptyLabel="Select vehicle size"
               tag="purple"
               options={withCurrentValue(vehicleSizeOptions, manifestFields.vehicle_size)}
               onChange={value => {
@@ -1484,7 +1518,7 @@ export default function ManifestDetailPage() {
               type="text"
               disabled={locked}
               value={manifestFields.job_reference}
-              placeholder="Empty"
+              placeholder="Enter a job number"
               onChange={e => setManifestFields(f => ({ ...f, job_reference: e.target.value }))}
               onBlur={e => saveManifestField('job_reference', e.target.value)}
               className={`w-full text-[12.5px] font-medium text-gray-800 dark:text-gray-100 placeholder:text-gray-300 dark:placeholder:text-navy-600 placeholder:font-normal bg-transparent border-none rounded-md px-2 py-1.5 -mx-2 hover:bg-gray-50 dark:hover:bg-navy-800/60 focus:bg-gray-50 dark:focus:bg-navy-800/60 focus:outline-none focus:ring-1 focus:ring-gray-300 dark:focus:ring-navy-600 transition-colors ${locked ? 'opacity-60 cursor-not-allowed' : ''}`}
@@ -1683,7 +1717,7 @@ export default function ManifestDetailPage() {
                                     <LocationSelect
                                       disabled={locked}
                                       value={manifestFields[first.editTarget.field]}
-                                      emptyLabel="Empty"
+                                      emptyLabel={first.editTarget.field === 'start_point' ? 'Select start point' : 'Select end point'}
                                       options={withCurrentValue(
                                         first.editTarget.field === 'start_point' ? startOptions : endOptions,
                                         manifestFields[first.editTarget.field],
