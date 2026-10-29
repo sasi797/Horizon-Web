@@ -107,7 +107,6 @@ export interface HawbManifest {
   end_point: string | null;
   skip_end_destination: boolean;
   job_reference: string | null;
-  account_number: string | null;
   customer_number: string | null;
   vehicle_size: string | null;
   service_type: string | null;
@@ -143,7 +142,6 @@ export interface HawbManifestUpdate {
   end_point?: string | null;
   skip_end_destination?: boolean;
   job_reference?: string | null;
-  account_number?: string | null;
   customer_number?: string | null;
   vehicle_size?: string | null;
   service_type?: string | null;

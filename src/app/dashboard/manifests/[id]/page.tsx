@@ -829,7 +829,6 @@ export default function ManifestDetailPage() {
   const [applyJobUpdate] = useApplyJobUpdateMutation();
   const { data: savedStartPoints = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'start_point' });
   const { data: savedEndPoints = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'end_point' });
-  const { data: savedAccountNumbers = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'account_number' });
   const { data: savedCustomerNumbers = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'customer_number' });
   const { data: savedServiceTypes = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'service_type' });
   const { data: savedVehicleSizes = [] } = useGetDropdownValuesQuery({ module: 'manifest', field_name: 'vehicle_size' });
@@ -846,7 +845,7 @@ export default function ManifestDetailPage() {
   const [jobForm, setJobForm] = useState<JobForm | null>(null);
   const [syncedFormFor, setSyncedFormFor] = useState<string | null>(null);
   const [manifestFields, setManifestFields] = useState({
-    start_point: '', end_point: '', job_reference: '', account_number: '', customer_number: '', vehicle_size: '',
+    start_point: '', end_point: '', job_reference: '', customer_number: '', vehicle_size: '',
     service_type: '',
   });
   const [syncedPointsFor, setSyncedPointsFor] = useState<string | undefined>(undefined);
@@ -923,7 +922,6 @@ export default function ManifestDetailPage() {
       start_point: manifest.start_point ?? '',
       end_point: manifest.end_point ?? '',
       job_reference: manifest.job_reference ?? '',
-      account_number: manifest.account_number ?? '',
       customer_number: manifest.customer_number ?? '',
       vehicle_size: manifest.vehicle_size ?? '',
       service_type: manifest.service_type ?? '',
@@ -1122,7 +1120,6 @@ export default function ManifestDetailPage() {
       ...jobPointCandidates,
     ]).entries(),
   ).map(([value, label]) => ({ value, label }));
-  const accountNumberOptions = savedAccountNumbers.map(v => ({ value: v.value, label: v.label }));
   const customerNumberOptions = savedCustomerNumbers.map(v => ({ value: v.value, label: v.label }));
   const serviceTypeOptions = savedServiceTypes.map(v => ({ value: v.value, label: v.label }));
   const vehicleSizeOptions = savedVehicleSizes.map(v => ({ value: v.value, label: v.label }));
@@ -1155,7 +1152,7 @@ export default function ManifestDetailPage() {
   };
 
   const saveManifestField = async (
-    field: 'start_point' | 'end_point' | 'job_reference' | 'account_number' | 'customer_number' | 'vehicle_size' | 'service_type',
+    field: 'start_point' | 'end_point' | 'job_reference' | 'customer_number' | 'vehicle_size' | 'service_type',
     value: string,
   ) => {
     if (locked) return;
@@ -1439,20 +1436,6 @@ export default function ManifestDetailPage() {
                 </label>
               </Tooltip>
             )}
-          </div>
-          <div className="min-w-0">
-            <PropLabel icon={Banknote} iconTone={ROW2_ICON_TONE} required>Account number</PropLabel>
-            <LocationSelect
-              disabled={locked}
-              value={manifestFields.account_number}
-              emptyLabel="Select account number"
-              tag="gray"
-              options={withCurrentValue(accountNumberOptions, manifestFields.account_number)}
-              onChange={value => {
-                setManifestFields(f => ({ ...f, account_number: value }));
-                saveManifestField('account_number', value);
-              }}
-            />
           </div>
           </>)}
           <div className="min-w-0">
