@@ -573,9 +573,7 @@ function ServiceTypePicker({
   );
 }
 
-// One booking system's outcome (Indigo or EasyTrans/mytransport) — both fire
-// concurrently on Export and are tracked independently, so one can be booked
-// while the other is still failed/unattempted.
+// EasyTrans/mytransport booking outcome for an exported manifest.
 function CarrierExportStatus({
   label, status, reference, trackingUrl, error,
 }: {
@@ -1064,8 +1062,8 @@ export default function ManifestDetailPage() {
   // shouldn't close at Start point but End point isn't decided yet.
   // Thinventory manifests (THINV-…) have no Start/End point — each job is just
   // its own Collection + Delivery — and book into EasyTrans only (Horizon-Api's
-  // thinv_auto_export), so those fields, the closing End stop and Indigo are
-  // all left out for them.
+  // thinv_auto_export), so those fields and the closing End stop are
+  // left out for them.
   const isThinv = manifest.reference_number.startsWith('THINV-');
   const effectiveEndPoint = manifestFields.end_point || (endMatchesStart ? manifestFields.start_point : '');
   const destinationStops = buildDestinationStops(
@@ -1077,7 +1075,6 @@ export default function ManifestDetailPage() {
     // when it defaults to Start point (the tick box under it).
     !isThinv && !manifestFields.start_point && 'Start point',
     !isThinv && !effectiveEndPoint && 'End point',
-    !isThinv && !manifestFields.account_number && 'Account number',
     !manifestFields.customer_number && 'Customer number',
     !manifestFields.service_type && 'Service type',
     !manifestFields.vehicle_size && 'Vehicle size',
@@ -1085,11 +1082,10 @@ export default function ManifestDetailPage() {
     jobsMissingService > 0 && `Del/Coll on ${jobsMissingService} job${jobsMissingService === 1 ? '' : 's'}`,
     jobsWithIncompleteAddress > 0 && `Shipper/Consignee details on ${jobsWithIncompleteAddress} job${jobsWithIncompleteAddress === 1 ? '' : 's'}`,
   ].filter((v): v is string => Boolean(v));
-  // Export books Indigo and EasyTrans independently — the button reappears
-  // (as a retry, not a fresh export) whenever the manifest already locked
-  // but one of the two still hasn't booked.
+  // The button reappears (as a retry, not a fresh export) whenever the
+  // manifest already locked but EasyTrans still hasn't booked.
   const canRetryExport = manifest.status === 'exported'
-    && ((!isThinv && manifest.indigo_export_status !== 'booked') || manifest.mytransport_export_status !== 'booked');
+    && manifest.mytransport_export_status !== 'booked';
   const showExportButton = (manifest.status === 'open' && !locked) || canRetryExport;
 
   // Start/end point pickers offer the Configuration defaults (module 'manifest',
@@ -1211,12 +1207,9 @@ export default function ManifestDetailPage() {
   };
 
   const handleExport = async () => {
-    // Neither system's login can ship in the frontend bundle, so both
-    // payloads are built and posted server-side, concurrently, in one call
-    // (see Horizon-Api's app/routers/hawb.py: export_manifest_dual). If one
-    // system already booked on a prior attempt, this only retries the one
-    // that's still 'failed' — see manifest.indigo_export_status /
-    // manifest.mytransport_export_status below.
+    // The login can't ship in the frontend bundle, so the payload is built and
+    // posted server-side (see Horizon-Api's app/routers/hawb.py:
+    // export_manifest_dual). See manifest.mytransport_export_status below.
     setExporting(true);
     setExportError(null);
     try {
@@ -1337,16 +1330,8 @@ export default function ManifestDetailPage() {
         </motion.div>
       )}
 
-      {(manifest.indigo_export_status || manifest.mytransport_export_status) && (
+      {manifest.mytransport_export_status && (
         <motion.div variants={staggerItem} className="flex flex-wrap items-center gap-2">
-          {!isThinv && (
-            <CarrierExportStatus
-              label="Indigo"
-              status={manifest.indigo_export_status}
-              reference={manifest.indigo_job_number}
-              error={manifest.indigo_export_error}
-            />
-          )}
           <CarrierExportStatus
             label="EasyTrans"
             status={manifest.mytransport_export_status}

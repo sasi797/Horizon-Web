@@ -111,9 +111,6 @@ export interface HawbManifest {
   customer_number: string | null;
   vehicle_size: string | null;
   service_type: string | null;
-  indigo_job_number: string | null;
-  indigo_export_status: 'booked' | 'failed' | null;
-  indigo_export_error: string | null;
   mytransport_order_no: string | null;
   mytransport_tracking_url: string | null;
   mytransport_export_status: 'booked' | 'failed' | null;
@@ -126,10 +123,9 @@ export interface HawbManifest {
   remarks: string | null;
 }
 
-// Export now books this manifest into Indigo and mytransport/EasyTrans at
-// once, concurrently — see Horizon-Api's app/routers/hawb.py
-// (export_manifest_dual). One can book while the other fails; a manifest
-// with one system still 'failed' can be re-exported to retry only that one.
+// Export books this manifest into mytransport/EasyTrans — see Horizon-Api's
+// app/routers/hawb.py (export_manifest_dual). A 'failed' manifest can be
+// re-exported to retry.
 export interface ExportSystemResult {
   status: 'booked' | 'failed' | 'skipped';
   reference?: string | null;
@@ -138,9 +134,8 @@ export interface ExportSystemResult {
 }
 
 export interface ExportManifestResult {
-  indigo: ExportSystemResult;
   mytransport: ExportSystemResult;
-  payloads?: { indigo: Record<string, unknown>; mytransport: Record<string, unknown> } | null;
+  payloads?: { mytransport: Record<string, unknown> } | null;
 }
 
 export interface HawbManifestUpdate {
