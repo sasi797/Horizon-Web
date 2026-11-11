@@ -1062,7 +1062,7 @@ export default function ManifestDetailPage() {
   // its own Collection + Delivery — and book into EasyTrans only (Horizon-Api's
   // thinv_auto_export), so those fields and the closing End stop are
   // left out for them.
-  const isThinv = manifest.reference_number.startsWith('THINV-');
+  const isThinv = /^(THINV|TRACE)-/.test(manifest.reference_number);
   const effectiveEndPoint = manifestFields.end_point || (endMatchesStart ? manifestFields.start_point : '');
   const destinationStops = buildDestinationStops(
     manifestFields.start_point, effectiveEndPoint, mergeSlots, !isThinv,
