@@ -718,17 +718,27 @@ function buildDestinationStops(
       continue;
     }
 
-    const legs: { key: string; field: 'shipper' | 'consignee'; address: string; collectDeliver: 0 | 1 }[] =
+    type Leg = {
+      key: string; field: 'shipper' | 'consignee'; address: string; collectDeliver: 0 | 1;
+      hawbNumbers: string[]; jobIds: string[];
+    };
+    // A round trip books each job's own two legs: a slot merged on a shared
+    // shipper contact can still deliver to different places, so reading
+    // group[0]'s consignee for all of them would drop the rest. Same-address
+    // legs fold together below (one pickup for several deliveries). Mirrors
+    // Horizon-Api's build_mytransport_order_payload.
+    const legs: Leg[] =
       sameDayRoundTrip
-        ? [
-          { key: `${slot.key}-collect`, field: 'shipper', address: job.shipper ?? '', collectDeliver: 0 },
-          { key: `${slot.key}-deliver`, field: 'consignee', address: job.consignee ?? '', collectDeliver: 1 },
-        ]
+        ? group.flatMap(j => [
+          { key: `${slot.key}-${j.id}-collect`, field: 'shipper' as const, address: j.shipper ?? '', collectDeliver: 0 as const, hawbNumbers: [j.hawb_number], jobIds: [j.id] },
+          { key: `${slot.key}-${j.id}-deliver`, field: 'consignee' as const, address: j.consignee ?? '', collectDeliver: 1 as const, hawbNumbers: [j.hawb_number], jobIds: [j.id] },
+        ])
         : job.job_service_type === 'collection'
-          ? [{ key: slot.key, field: 'shipper', address: job.shipper ?? '', collectDeliver: 0 }]
-          : [{ key: slot.key, field: 'consignee', address: job.consignee ?? '', collectDeliver: 1 }];
+          ? [{ key: slot.key, field: 'shipper', address: job.shipper ?? '', collectDeliver: 0, hawbNumbers, jobIds }]
+          : [{ key: slot.key, field: 'consignee', address: job.consignee ?? '', collectDeliver: 1, hawbNumbers, jobIds }];
 
     for (const leg of legs) {
+      const { hawbNumbers, jobIds } = leg;
       // Two different run-order slots (no shared consignee/contact, so they
       // weren't merged on the Merge tab) can still resolve to the exact same
       // physical stop — e.g. two collections from the same building, anywhere
@@ -750,6 +760,12 @@ function buildDestinationStops(
         match.hawbNumbers = [...match.hawbNumbers, ...hawbNumbers];
         if (match.editTarget.kind === 'jobs') {
           match.editTarget = { kind: 'jobs', field: match.editTarget.field, jobIds: [...match.editTarget.jobIds, ...jobIds] };
+        }
+        // A round-trip delivery that absorbs a job moves to the end, so it
+        // still comes after that job's own pickup (mirrors Horizon-Api).
+        if (sameDayRoundTrip && leg.collectDeliver === 1) {
+          stops.splice(stops.indexOf(match), 1);
+          stops.push(match);
         }
         continue;
       }
